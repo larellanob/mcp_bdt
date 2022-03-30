@@ -7,12 +7,12 @@ import pandas
 import os
 
 debug = True
-necessary_dirs = ["model","root","img"]
+necessary_dirs = ["models","root","img"]
 for d in necessary_dirs:
     if not os.path.exists(d):
         os.mkdir(d)
 
-model = "my_model_1"
+model = "my_model_2"
 input_root_file = 'root/spacepoints.root_output.root'
 
 #################################################################################
@@ -45,6 +45,7 @@ if debug:
 
 tree = uproot_file['tsig_train']
 branches = tree.arrays()
+print("branches",branches)
 
 
 if debug:
@@ -103,27 +104,28 @@ if debug:
 # he gets using params = params_getter(args.model)
 # this function looks into the file but i'm not sure what returns
 
-t_train_sig = uproot_file['tsig_train'].arrays(featmap_list,library="pd")
-t_train_bkg = uproot_file['tbg_train'].arrays(featmap_list,library="pd")
-t_test_sig = uproot_file['tsig_test'].arrays(featmap_list,library="pd")
-t_test_bkg = uproot_file['tbg_test'].arrays(featmap_list,library="pd")
+train_sig = uproot_file['tsig_train'].arrays(featmap_list,library="pd")
+train_bkg = uproot_file['tbg_train'].arrays(featmap_list,library="pd")
+test_sig = uproot_file['tsig_test'].arrays(featmap_list,library="pd")
+test_bkg = uproot_file['tbg_test'].arrays(featmap_list,library="pd")
 
 
 
 if debug:
-    print(t_train_bkg)
+    print(train_bkg)
+    print("train_bkg type:",type(train_bkg))
     print(featmap_list)
-    reduced = t_train_bkg[0:5]
+    reduced = train_bkg[0:5]
     print(reduced)
     print("len featmap list",len(featmap_list))
-    print("len t train sig",len(t_train_sig))
+    print("len t train sig",len(train_sig))
     
 # take 70% and use for train, remaining for test
-train_fraction = 0.7
-train_sig = t_train_sig[:int(len(t_train_sig)*train_fraction)]
-test_sig = t_train_sig[int(len(t_train_sig)*train_fraction):]
-train_bkg = t_train_bkg[:int(len(t_train_bkg)*train_fraction)]
-test_bkg = t_train_bkg[int(len(t_train_bkg)*train_fraction):]
+#train_fraction = 0.7
+#train_sig = t_train_sig[:int(len(t_train_sig)*train_fraction)]
+#test_sig = t_train_sig[int(len(t_train_sig)*train_fraction):]
+#train_bkg = t_train_bkg[:int(len(t_train_bkg)*train_fraction)]
+#test_bkg = t_train_bkg[int(len(t_train_bkg)*train_fraction):]
 
 # remove nans
 #train_sig = pandas.DataFrame(train_sig).fillna(0)
@@ -161,7 +163,6 @@ watchlist = [(xgb_train_sig,'train_sig'), # you are training with this
              (xgb_train_bkg,'train_bkg'), # so watching metrics not useful?
              (xgb_test_sig,'test_sig'),
              (xgb_test_bkg,'test_bkg')]
-
 
 # https://xgboost.readthedocs.io/en/stable/python/python_api.html#module-xgboost.training
 #xgboost.train(params,               #Booster params.
@@ -216,10 +217,10 @@ if debug:
     print("####################################################################")
 
 xgb.plot_importance(bdt)
-plt.show()
+#plt.show()
 
 xgb.plot_tree(bdt)
-plt.show()
+#plt.show()
 
 if debug:
     print("scores:")
@@ -249,9 +250,20 @@ output_root_file = "root/%s_BDT_scores.root"%(model)
 #             (xgb_test_bkg,'test_bkg')]
 
 # pawel saves multiple runs, look into that
+
+print(xgb_train_sig)
+print("type of train_sig is ",type(train_sig))
+print(train_sig)
+print(train_sig['px1'])
+
+
 with uproot.recreate(output_root_file) as f:
     for sample in watchlist:
         # sample[0] is the DMatrix
         # sample[1] is the string
         prediction = bdt.predict(sample[0], output_margin=True)
+        print(type(prediction))
+        print(type(sample[0]))
+        print(prediction.size)
         f[sample[1]] = {"bdt": prediction}
+        #f[sample[1]] = {"test": 2.3}
