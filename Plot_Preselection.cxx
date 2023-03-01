@@ -1,16 +1,27 @@
-void Plot_Angle()
+void Plot_Preselection()
 {
-  TFile *f = new TFile("spacepoints.root");
+  TString model = "model_221207_combinedmass_pot";
+  TFile *f = new TFile(Form("root/%s/spacepoints_1000kev_2hits_combinedmass.root",model.Data()));
   //TH2F * full_angles = new TH2F("full_angles",
   TTree *tree = (TTree*)f->Get("t");
 
-  TH2F * bkg = new TH2F("bkg","angles background;#Delta#theta;#Delta#phi",50,0,90,50,-180,180);
+  TH2F * bkg = new TH2F("bkg","Background pair angle distribution;#Delta#theta;#Delta#phi",50,0,90,50,-180,180);
   //  bkg->SetLineColor(kRed);
 
-  TH2F * sig = new TH2F("sig","angles signal;theta;phi",50,0,90,50,-180,180);
-  TH2F * bkg_and_sig = new TH2F("bkg_and_sig","angles bkg+sig;#Delta#theta;#Delta#phi",50,0,90,50,-180,180);
+  TH2F * sig = new TH2F("sig","Signal pair angle distribution;theta;phi",50,0,90,50,-180,180);
+  TH2F * bkg_and_sig = new TH2F("bkg_and_sig","Pair angle distribution bkg+sig;#Delta#theta;#Delta#phi",50,0,90,50,-180,180);
+
+  TH2F * bkg_and_sig_zoom = new TH2F("bkg_and_sig_zoom","Pair angle distribution bkg+sig;#Delta#theta;#Delta#phi",50,20,35,50,-10,20);
 
   TH1F * dist = new TH1F("dist","dist to true hits;distance",500,0,1200);
+
+  bool preselection = true;
+  TH1F * nsps = new TH1F("nsps","Before preselection;Number of spacepoints;Events",50,0,200);
+  TH1F * nsps_pairs = new TH1F("nsps_pairs","Before preselection;Number of spacepoint pairs;Events",200,0,8000);
+  if ( preselection ) {
+    nsps->SetTitle("After preselection");
+    nsps_pairs->SetTitle("After preselection");
+  }
 
   vector<double> *pxs = 0, *pys = 0, *pzs = 0, *adcs = 0;
   vector<double> *true_xs = 0, *true_ys = 0, *true_zs = 0, *true_adcs = 0, *true_enes = 0;
@@ -47,7 +58,7 @@ void Plot_Angle()
     const TVector3 tp1{tx1,ty1,tz1};
     const TVector3 tp2{tx2,ty2,tz2};
     if ( true_xs->size() > 2 ) {
-      std::cout << true_xs->size() << "true hits!" << std::endl;
+      std::cout << true_xs->size() << "true hits! event " << ievent << std::endl;
     }
     // calculate the angles (sort them according to z position)
     ot_truetheta = true_zs->size() == 2 ? (tz1 < tz2 ? (tp2-tp1).Unit().Theta() : (tp1-tp2).Unit().Theta()) : 0.;
@@ -56,10 +67,13 @@ void Plot_Angle()
     sig->Fill(ot_truetheta*TMath::RadToDeg(),ot_truephi*TMath::RadToDeg());
 
     // loop over all reconstructed spacepoints
+    int nsps_counter {0};
+    int nsps_pairs_counter {0};
     for(size_t isps = 0; isps < pxs->size(); ++isps) {
       const double adc1 = adcs->at(isps);
-      if(adc1 < 100 || adc1 > 1000) continue;
-
+      if( preselection && (adc1 < 100 || adc1 > 3630) ) continue;
+      nsps_counter++;
+      
       const double px1 = pxs->at(isps);
       const double py1 = pys->at(isps);
       const double pz1 = pzs->at(isps);
@@ -70,7 +84,8 @@ void Plot_Angle()
       
       for(size_t jsps = isps+1; jsps < pxs->size(); ++jsps) {
 	const double adc2 = adcs->at(jsps);
-        if(adc2 < 100 || adc2 > 1000) continue;
+        if( preselection && (adc2 < 100 || adc2 > 3630) ) continue;
+	nsps_pairs_counter++;
 	const double px2 = pxs->at(jsps);
         const double py2 = pys->at(jsps);
         const double pz2 = pzs->at(jsps);
@@ -84,15 +99,14 @@ void Plot_Angle()
         const TVector3& dir = diff.Unit();
 
 	bkg_and_sig->Fill(ot_dirtheta*TMath::RadToDeg(),ot_dirphi*TMath::RadToDeg());
+	bkg_and_sig_zoom->Fill(ot_dirtheta*TMath::RadToDeg(),ot_dirphi*TMath::RadToDeg());
 	
 	ot_dirtheta = dir.Theta();
         ot_dirphi = dir.Phi();
-
-
-	
-	
       }
     }
+    nsps->Fill(nsps_counter);
+    nsps_pairs->Fill(nsps_pairs_counter);
     
   }
 
@@ -101,20 +115,35 @@ void Plot_Angle()
 
   auto c1 = new TCanvas();
   //c1->SetLogy();
+  gStyle->SetOptStat(0);
 
   sig->Draw("colz");
   TLegend *myleg = new TLegend();
   myleg = c1->BuildLegend(0.1,0.7,0.3,0.9,"","");
-  
-  c1->SaveAs("Angles_signal.pdf");
+
+  TString outname;
+  TString tail = ".pdf";
+  if ( preselection ) tail = "_preselection.pdf";
+
+  gSystem->Exec(Form("mkdir -p img/%s/",model.Data()));
+
+  c1->SaveAs(Form("img/%s/Angles_signal%s",model.Data(),tail.Data()));
 
   bkg->Draw("colz");
-  c1->SaveAs("Angles_background.pdf");
+  c1->SaveAs("img/"+model+"/Angles_background"+tail);
 
   bkg_and_sig->Draw("colz");
-  c1->SaveAs("Angles_background_and_signal.pdf");
+  c1->SaveAs("img/"+model+"/Angles_background_and_signal"+tail);
+
+  bkg_and_sig_zoom->Draw("colz");
+  c1->SaveAs("img/"+model+"/Angles_background_and_signal_zoom"+tail);
 
   dist->Draw("");
-  c1->SaveAs("Angles_distance_to_true.pdf");
+  c1->SaveAs("img/"+model+"/Angles_distance_to_true"+tail);
+
+  nsps->Draw();
+  c1->SaveAs("img/"+model+"/nsps"+tail);
+  nsps_pairs->Draw();
+  c1->SaveAs("img/"+model+"/nsps_pairs"+tail);
   
 }

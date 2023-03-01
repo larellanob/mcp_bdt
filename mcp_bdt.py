@@ -1,20 +1,24 @@
 #!/usr/bin/python3
 
 import xgboost as xgb
+xgb.set_config(verbosity=2)
 from  matplotlib import pyplot as plt
 import uproot
 import pandas
 import os
+import numpy as np
+import numpy.ma as ma # masked numpy arrays, to remove invalid data
+from sklearn.preprocessing import StandardScaler
 
-debug = True
+
+debug = False
 necessary_dirs = ["models","root","img"]
 for d in necessary_dirs:
     if not os.path.exists(d):
         os.mkdir(d)
 
-model = "my_model_2"
-input_root_file = 'root/spacepoints.root_output.root'
-
+model = "model_230123_normal_thresholds"
+input_root_file = 'root/%s/preselection_1000kev_2hits_combinedmass.root'%(model)
 #################################################################################
 #################################################################################
 #################################################################################
@@ -66,10 +70,10 @@ featmap_vars = {
             'dca_nhO_mid', 'dca_nhO_ahead', 'dca_nhM_behind', 'dca_nhM_mid',
                  'dca_nhM_ahead'],
 #            'sum_nhits_1','sum_nhits_2','sum_nhits'],
-        'q':[ 'px1', 'py1', 'pz1', 'adc1', 'px2', 'py2', 'pz2', 'adc2',
-            'dist', 'theta', 'phi', 'dca_behind', 'dca_mid',
-            'dca_ahead', 'dca_adc_behind', 'dca_adc_mid', 'dca_adc_ahead',
-            'mindist_closest', 'mindist_adc_closest' ],
+        'q':[ 'px1', 'py1', 'pz1', 'log10_adc1', 'px2', 'py2', 'pz2', 'log10_adc2',
+            'dist', 'theta', 'phi', 'sqrt_dca_behind', 'sqrt_dca_mid',
+            'sqrt_dca_ahead', 'dca_log10_adc_behind', 'dca_log10_adc_mid', 'dca_log10_adc_ahead',
+            'sqrt_mindist_closest', 'mindist_log10_adc_closest' ],
         'i':[],
         }
 
@@ -85,14 +89,17 @@ for i in tree.keys():
         if i in featmap_vars[j]:
             line = str(featmap_counter)+"\t"+str(i)+"\t"+str(j)+"\n"
             featmap_file.write(line)
+            print("--------")
+            print(i,j)
+            print(line)
+            print("--------")
             featmap_list.append(i)
             featmap_counter+=1
-#featmap_file.close()
+featmap_file.close()
 # do not close! we will keep using this
-
-# i have created a featmap.txt file
-# is this all pawel's make_featmap do?
-# do i need to store this somewhere else? (a list, etc)
+# yes close, then we open again
+print(featmap_list)
+print(len(featmap_list))
 
 if debug:
     print("####################################################################")
@@ -104,19 +111,28 @@ if debug:
 # he gets using params = params_getter(args.model)
 # this function looks into the file but i'm not sure what returns
 
-train_sig = uproot_file['tsig_train'].arrays(featmap_list,library="pd")
-train_bkg = uproot_file['tbg_train'].arrays(featmap_list,library="pd")
-test_sig = uproot_file['tsig_test'].arrays(featmap_list,library="pd")
-test_bkg = uproot_file['tbg_test'].arrays(featmap_list,library="pd")
+train_sig = uproot_file['tsig_train'].arrays(featmap_list,library="np")
+train_bkg = uproot_file['tbg_train'].arrays(featmap_list,library="np")
+test_sig = uproot_file['tsig_test'].arrays(featmap_list,library="np")
+test_bkg = uproot_file['tbg_test'].arrays(featmap_list,library="np")
 
 
 
 if debug:
+    print('train background')
     print(train_bkg)
-    print("train_bkg type:",type(train_bkg))
+    print("train_bkg type:")
+    print(type(train_bkg))
+    print("train_bkg type:")
+    print(type(train_bkg))
+    print("train background ['px1']")
+    print(train_bkg['px1'])
+    print("len train bkg ['px1']")
+    print(len(train_bkg['px1']))
+    print('featmap list')
     print(featmap_list)
-    reduced = train_bkg[0:5]
-    print(reduced)
+    #reduced = train_bkg[0:5]
+    #print(reduced)
     print("len featmap list",len(featmap_list))
     print("len t train sig",len(train_sig))
     
@@ -133,36 +149,103 @@ if debug:
 #train_bkg = pandas.DataFrame(train_bkg).fillna(0)
 #test_bkg  = pandas.DataFrame(test_sig).fillna(0)
 
+#numpy train_sig
 
-print("Pandas version:",pandas.__version__)
-print("xgb version:",xgb.__version__)
+#train_sig_concat = np.stack((train_sig['px1'],train_sig['px2']))
+train_sig_data = np.stack((train_sig[y] for y in featmap_list))
+train_bkg_data = np.stack((train_bkg[y] for y in featmap_list))
+test_sig_data = np.stack((test_sig[y] for y in featmap_list))
+test_bkg_data = np.stack((test_bkg[y] for y in featmap_list))
+
+print("TRAIN SIG DATA MAX MIN",np.amax(train_sig_data),np.amin(train_sig_data))
+
+# full train dataset
+train_data = np.concatenate((train_sig_data,train_bkg_data),1)
+# remove numbers which are too large (and unphysical)
+train_data = ma.masked_greater(train_data,1e90) # mask numbers above 1e90
+train_data = train_data.filled(-10000) # actually replace them with -10000
+# do the same for other datasets
+
+train_sig_data = ma.masked_greater(train_sig_data,1e90)
+train_sig_data = train_sig_data.filled(-10000)
+train_bkg_data = ma.masked_greater(train_bkg_data,1e90)
+train_bkg_data = train_bkg_data.filled(-10000)
+test_sig_data = ma.masked_greater(test_sig_data,1e90)
+test_sig_data = test_sig_data.filled(-10000)
+test_bkg_data = ma.masked_greater(test_bkg_data,1e90)
+test_bkg_data = test_bkg_data.filled(-10000)
+
 
 
 if debug:
-    print('len train sig',len(train_sig),'bg',len(train_bkg))
-    print('len test sig',len(test_sig),'bg',len(test_bkg))
+    print("train_sig_concat")
+    print(train_sig_data)
+    print("train_sig_data dim, shape")
+    print(train_sig_data.ndim,train_sig_data.shape)
+    print("list of features and first entry")
+    for y in featmap_list:
+        print(y,train_sig[y][0])
+
+
+    print("Pandas version:",pandas.__version__)
+    print("xgb version:",xgb.__version__)
+
+    print('len train sig',len(train_sig),'bkg',len(train_bkg))
+    print('len test sig',len(test_sig),'bkg',len(test_bkg))
     print("\nAll good so far\n")
 
-truth_label = [1]*len(train_sig) + [0]*len(train_bkg)
+#truth_label = [1]*len(train_sig) + [0]*len(train_bkg)
 
-if debug:
-    print(truth_label)
-    print(pandas.concat([train_sig,train_bkg]))
 
+truth_label = np.concatenate((np.zeros(len(train_bkg_data[0])),np.ones(len(train_sig_data[0]))))
+print(truth_label)
+print(truth_label.size)
+print(type(truth_label))
+truth_label=truth_label.ravel()
+print("flattened")
+print(truth_label)
+print(truth_label.size)
+print(type(truth_label))
+train_data = np.transpose(train_data)
+print("train_data dim, shape")
+print(train_data.ndim,train_data.shape)
+
+print("\nsig_data\n")
+print(train_sig_data.size)
+print(train_sig_data.ndim,train_sig_data.shape)
+l = [1]*len(train_sig_data[0])
+l2=[0]*len(train_bkg_data[0])
+l3=[1]*len(test_sig_data[0])
+l4=[0]*len(test_bkg_data[0])
+
+print(len(l))
+
+train_sig_data = np.transpose(train_sig_data)
+train_bkg_data = np.transpose(train_bkg_data)
+test_sig_data = np.transpose(test_sig_data)
+test_bkg_data = np.transpose(test_bkg_data)
 
 ### training proper
-
-# why these four?
-xgb_train     = xgb.DMatrix(pandas.concat([train_sig,train_bkg]),truth_label)
-xgb_train_sig = xgb.DMatrix(train_sig,label=[1]*len(train_sig))
-xgb_train_bkg = xgb.DMatrix(train_bkg,label=[0]*len(train_bkg))
-xgb_test_sig  = xgb.DMatrix(test_sig,label=[1]*len(test_sig))
-xgb_test_bkg  = xgb.DMatrix(test_bkg,label=[0]*len(test_bkg))
+xgb_train     = xgb.DMatrix(train_data,label=truth_label)
+xgb_train_sig = xgb.DMatrix(train_sig_data)
+xgb_train_sig.set_label(l)
+#xgb_train_sig = xgb.DMatrix(train_sig_data,label=[1]*len(train_sig_data[0]))
+#xgb_train_bkg = xgb.DMatrix(train_bkg_data,label=[0]*len(train_bkg_data[0]))
+#xgb_test_sig  = xgb.DMatrix(test_sig_data,label=[1]*len(test_sig_data[0]))
+#xgb_test_bkg  = xgb.DMatrix(test_bkg_data,label=[0]*len(test_bkg_data[0]))
+xgb_train_bkg = xgb.DMatrix(train_bkg_data)
+xgb_train_bkg.set_label(l2)
+xgb_test_sig  = xgb.DMatrix(test_sig_data)
+xgb_test_sig.set_label(l3)
+xgb_test_bkg  = xgb.DMatrix(test_bkg_data)
+xgb_test_bkg.set_label(l4)
 
 watchlist = [(xgb_train_sig,'train_sig'), # you are training with this
              (xgb_train_bkg,'train_bkg'), # so watching metrics not useful?
              (xgb_test_sig,'test_sig'),
              (xgb_test_bkg,'test_bkg')]
+if debug:
+    print("xgb dmatrices made, watchlist made successfully")
 
 # https://xgboost.readthedocs.io/en/stable/python/python_api.html#module-xgboost.training
 #xgboost.train(params,               #Booster params.
@@ -216,12 +299,13 @@ if debug:
     print("                              results                               ")
     print("####################################################################")
 
-xgb.plot_importance(bdt)
+#xgb.plot_importance(bdt)
 #plt.show()
 
-xgb.plot_tree(bdt)
+#xgb.plot_tree(bdt)
 #plt.show()
 
+featmap_file = open(featmap_file_name,'r')
 if debug:
     print("scores:")
     print("featmap file type",type(featmap_file_name))
