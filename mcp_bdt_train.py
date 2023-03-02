@@ -19,7 +19,7 @@ for d in necessary_dirs:
 
 
 
-fcl_th = "low-th"
+fcl_th = "def-th"
 gen_th = "1000"
 nhits  = "2"
 
@@ -70,7 +70,6 @@ if debug:
     print("####################################################################")
 
 # make featmap file
-params = {'px1'}
 featmap_vars = {
         'int':[  'nhits1', 'nhitsO1', 'nhitsM1',  'nhits2',
             'nhitsO2', 'nhitsM2', 'dca_nh2_behind', 'dca_nh2_mid', 'dca_nh2_ahead', 'dca_nhO_behind',
@@ -113,10 +112,6 @@ if debug:
     print("                               train                                ")
     print("####################################################################")
 
-# equivalent to pawel's train.py
-
-# he gets using params = params_getter(args.model)
-# this function looks into the file but i'm not sure what returns
 
 train_sig = uproot_file['tsig_train'].arrays(featmap_list,library="np")
 train_bkg = uproot_file['tbg_train'].arrays(featmap_list,library="np")
@@ -125,44 +120,11 @@ test_bkg = uproot_file['tbg_test'].arrays(featmap_list,library="np")
 
 
 
-if debug:
-    print('train background')
-    print(train_bkg)
-    print("train_bkg type:")
-    print(type(train_bkg))
-    print("train_bkg type:")
-    print(type(train_bkg))
-    print("train background ['px1']")
-    print(train_bkg['px1'])
-    print("len train bkg ['px1']")
-    print(len(train_bkg['px1']))
-    print('featmap list')
-    print(featmap_list)
-    #reduced = train_bkg[0:5]
-    #print(reduced)
-    print("len featmap list",len(featmap_list))
-    print("len t train sig",len(train_sig))
-    
-# take 70% and use for train, remaining for test
-#train_fraction = 0.7
-#train_sig = t_train_sig[:int(len(t_train_sig)*train_fraction)]
-#test_sig = t_train_sig[int(len(t_train_sig)*train_fraction):]
-#train_bkg = t_train_bkg[:int(len(t_train_bkg)*train_fraction)]
-#test_bkg = t_train_bkg[int(len(t_train_bkg)*train_fraction):]
-
-# remove nans
-#train_sig = pandas.DataFrame(train_sig).fillna(0)
-#test_sig  = pandas.DataFrame(test_sig).fillna(0)
-#train_bkg = pandas.DataFrame(train_bkg).fillna(0)
-#test_bkg  = pandas.DataFrame(test_sig).fillna(0)
-
-#numpy train_sig
-
 #train_sig_concat = np.stack((train_sig['px1'],train_sig['px2']))
-train_sig_data = np.stack((train_sig[y] for y in featmap_list))
-train_bkg_data = np.stack((train_bkg[y] for y in featmap_list))
-test_sig_data = np.stack((test_sig[y] for y in featmap_list))
-test_bkg_data = np.stack((test_bkg[y] for y in featmap_list))
+train_sig_data = np.stack(list(train_sig[y] for y in featmap_list))
+train_bkg_data = np.stack(list(train_bkg[y] for y in featmap_list))
+test_sig_data  = np.stack(list(test_sig[y]  for y in featmap_list))
+test_bkg_data  = np.stack(list(test_bkg[y]  for y in featmap_list))
 
 print("TRAIN SIG DATA MAX MIN",np.amax(train_sig_data),np.amin(train_sig_data))
 
@@ -177,10 +139,10 @@ train_sig_data = ma.masked_greater(train_sig_data,1e90)
 train_sig_data = train_sig_data.filled(-10000)
 train_bkg_data = ma.masked_greater(train_bkg_data,1e90)
 train_bkg_data = train_bkg_data.filled(-10000)
-test_sig_data = ma.masked_greater(test_sig_data,1e90)
-test_sig_data = test_sig_data.filled(-10000)
-test_bkg_data = ma.masked_greater(test_bkg_data,1e90)
-test_bkg_data = test_bkg_data.filled(-10000)
+test_sig_data  = ma.masked_greater(test_sig_data,1e90)
+test_sig_data  = test_sig_data.filled(-10000)
+test_bkg_data  = ma.masked_greater(test_bkg_data,1e90)
+test_bkg_data  = test_bkg_data.filled(-10000)
 
 
 
@@ -200,8 +162,6 @@ if debug:
     print('len train sig',len(train_sig),'bkg',len(train_bkg))
     print('len test sig',len(test_sig),'bkg',len(test_bkg))
     print("\nAll good so far\n")
-
-#truth_label = [1]*len(train_sig) + [0]*len(train_bkg)
 
 
 truth_label = np.concatenate((np.zeros(len(train_bkg_data[0])),np.ones(len(train_sig_data[0]))))
@@ -236,7 +196,6 @@ test_bkg_data = np.transpose(test_bkg_data)
 xgb_train     = xgb.DMatrix(train_data,label=truth_label)
 xgb_train_sig = xgb.DMatrix(train_sig_data)
 xgb_train_sig.set_label(l)
-
 
 xgb_train_bkg = xgb.DMatrix(train_bkg_data)
 xgb_train_bkg.set_label(l2)
@@ -377,24 +336,24 @@ for m in masses:
     sig_test = test_uproot['tsig_test'].arrays(featmap_list,library='np')
     bkg_test = test_uproot['tbg_test'].arrays(featmap_list,library='np')
 
-    sig_stacked = np.stack((sig_test[y] for y in featmap_list))
-    bkg_stacked = np.stack((bkg_test[y] for y in featmap_list))
+    sig_test = np.stack(list(sig_test[y] for y in featmap_list))
+    bkg_test = np.stack(list(bkg_test[y] for y in featmap_list))
 
-    sig_trans = np.transpose(sig_stacked)
-    bkg_trans = np.transpose(bkg_stacked)
+    sig_test = np.transpose(sig_test)
+    bkg_test = np.transpose(bkg_test)
 
-    sig_trans = ma.masked_greater(sig_trans,1e90)
-    sig_trans = sig_trans.filled(-10000)
-    bkg_trans = ma.masked_greater(bkg_trans,1e90)
-    bkg_trans = bkg_trans.filled(-10000)
+    sig_test = ma.masked_greater(sig_test,1e90)
+    sig_test = sig_test.filled(-10000)
+    bkg_test = ma.masked_greater(bkg_test,1e90)
+    bkg_test = bkg_test.filled(-10000)
 
-    xgb_test_sig2 = xgb.DMatrix(sig_trans)
-    xgb_test_bkg2 = xgb.DMatrix(bkg_trans)
+    xgb_test_sig2 = xgb.DMatrix(sig_test)
+    xgb_test_bkg2 = xgb.DMatrix(bkg_test)
 
-    l_bkg=[0]*len(bkg_trans)
-    l_sig=[1]*len(sig_trans)
-    xgb_test_bkg2.set_label(l_bkg)
-    xgb_test_sig2.set_label(l_sig)
+    #l_bkg=[0]*len(bkg_test)
+    #l_sig=[1]*len(sig_test)
+    #xgb_test_bkg2.set_label(l_bkg)
+    #xgb_test_sig2.set_label(l_sig)
 
     samples = watchlist
     samples[0] += (test_uproot['tsig_train'].arrays(["run","evt"],library="pd"),)
