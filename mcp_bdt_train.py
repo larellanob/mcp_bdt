@@ -17,8 +17,15 @@ for d in necessary_dirs:
     if not os.path.exists(d):
         os.mkdir(d)
 
-model = "model_230123_normal_thresholds"
-input_root_file = 'root/%s/preselection_1000kev_2hits_combinedmass.root'%(model)
+
+
+fcl_th = "low-th"
+gen_th = "1000"
+nhits  = "2"
+
+tag   = "%s_%skev_%shits"%(fcl_th,gen_th,nhits)
+model = "%s_230301"%(tag)
+input_root_file = 'root/%s/preselection_%skev_%shits_combinedmass.root'%(tag,gen_th,nhits)
 #################################################################################
 #################################################################################
 #################################################################################
@@ -229,10 +236,8 @@ test_bkg_data = np.transpose(test_bkg_data)
 xgb_train     = xgb.DMatrix(train_data,label=truth_label)
 xgb_train_sig = xgb.DMatrix(train_sig_data)
 xgb_train_sig.set_label(l)
-#xgb_train_sig = xgb.DMatrix(train_sig_data,label=[1]*len(train_sig_data[0]))
-#xgb_train_bkg = xgb.DMatrix(train_bkg_data,label=[0]*len(train_bkg_data[0]))
-#xgb_test_sig  = xgb.DMatrix(test_sig_data,label=[1]*len(test_sig_data[0]))
-#xgb_test_bkg  = xgb.DMatrix(test_bkg_data,label=[0]*len(test_bkg_data[0]))
+
+
 xgb_train_bkg = xgb.DMatrix(train_bkg_data)
 xgb_train_bkg.set_label(l2)
 xgb_test_sig  = xgb.DMatrix(test_sig_data)
@@ -325,29 +330,101 @@ if debug:
     print("                               export                               ")
     print("####################################################################")
 
-output_root_file = "root/%s_BDT_scores.root"%(model)
+
+# we now want to make a graph for checking overtraining
+# currently saving a root file with combined masses, then using a root macro to plot
+# want to just plot directly here and don't bother creating that root file
+# the root files we do need are mass by mass, not combined
+    
+output_root_file = "root/%s/%s_BDT_scores.root"%(tag,model)
+print("Exporting file "+output_root_file)
 
 
-#watchlist = [(xgb_train_sig,'train_sig'), # you are training with this
-#             (xgb_train_bkg,'train_bkg'), # so watching metrics not useful?
-#             (xgb_test_sig,'test_sig'),
-#             (xgb_test_bkg,'test_bkg')]
-
-# pawel saves multiple runs, look into that
-
-print(xgb_train_sig)
-print("type of train_sig is ",type(train_sig))
-print(train_sig)
-print(train_sig['px1'])
-
+samples = watchlist
+samples[0] += (uproot_file['tsig_train'].arrays(["run","evt"],library="pd"),)
+samples[1] += (uproot_file['tbg_train'].arrays(["run","evt"],library="pd"),)
+samples[2] += (uproot_file['tsig_test'].arrays(["run","evt"],library="pd"),)
+samples[3] += (uproot_file['tbg_test'].arrays(["run","evt"],library="pd"),)
 
 with uproot.recreate(output_root_file) as f:
-    for sample in watchlist:
+    for sample in samples:
         # sample[0] is the DMatrix
         # sample[1] is the string
         prediction = bdt.predict(sample[0], output_margin=True)
-        print(type(prediction))
-        print(type(sample[0]))
-        print(prediction.size)
-        f[sample[1]] = {"bdt": prediction}
-        #f[sample[1]] = {"test": 2.3}
+        
+        # branches which will go in the file are input from dictionary
+        # they get added backwards for some reason
+        branches = {}
+        branches['run'] = sample[2]['run'].to_numpy()
+        branches['evt'] = sample[2]['evt'].to_numpy()
+        branches['bdt'] = prediction
+
+        f[sample[1]] = branches
+
+masses = [100,150,200,300,350,400]
+
+for m in masses:
+    print("MASS:",m)
+
+    #output_test_root_file = "root/%s/%s_BDT_scores_mass%s.root"%(tag,model,m)
+    test_file = 'root/%s/preselection_%skev_%shits_%smev.root'%(tag,gen_th,nhits,m)
+    print("opened file",test_file)
+    test_uproot = uproot.open(test_file)
+
+    bdt_test = xgb.Booster()
+    bdt_test.load_model("models/%s_model.json"%(model))
+
+    sig_test = test_uproot['tsig_test'].arrays(featmap_list,library='np')
+    bkg_test = test_uproot['tbg_test'].arrays(featmap_list,library='np')
+
+    sig_stacked = np.stack((sig_test[y] for y in featmap_list))
+    bkg_stacked = np.stack((bkg_test[y] for y in featmap_list))
+
+    sig_trans = np.transpose(sig_stacked)
+    bkg_trans = np.transpose(bkg_stacked)
+
+    sig_trans = ma.masked_greater(sig_trans,1e90)
+    sig_trans = sig_trans.filled(-10000)
+    bkg_trans = ma.masked_greater(bkg_trans,1e90)
+    bkg_trans = bkg_trans.filled(-10000)
+
+    xgb_test_sig2 = xgb.DMatrix(sig_trans)
+    xgb_test_bkg2 = xgb.DMatrix(bkg_trans)
+
+    l_bkg=[0]*len(bkg_trans)
+    l_sig=[1]*len(sig_trans)
+    xgb_test_bkg2.set_label(l_bkg)
+    xgb_test_sig2.set_label(l_sig)
+
+    samples = watchlist
+    samples[0] += (test_uproot['tsig_train'].arrays(["run","evt"],library="pd"),)
+    samples[1] += (test_uproot['tbg_train'].arrays(["run","evt"],library="pd"),)
+    samples[2] += (test_uproot['tsig_test'].arrays(["run","evt"],library="pd"),)
+    samples[3] += (test_uproot['tbg_test'].arrays(["run","evt"],library="pd"),)
+
+
+    out_test_file = 'root/%s/test_BDT_scores_%skev_%shits_%smev.root'%(tag,gen_th,nhits,m)
+    print("saving file",out_test_file)
+    with uproot.recreate(out_test_file) as f2:
+        for sample in samples:
+            # sample[0] is the DMatrix
+            # sample[1] is the string
+            prediction = bdt.predict(sample[0], output_margin=True)
+            
+            # branches which will go in the file are input from dictionary
+            # they get added backwards for some reason
+            branches = {}
+            branches['run'] = sample[2]['run'].to_numpy()
+            branches['evt'] = sample[2]['evt'].to_numpy()
+            branches['bdt'] = prediction
+            
+            f2[sample[1]] = branches
+
+            
+
+# Make_BDT_histograms.cxx already loops over masses
+root_arg = '"%s"'%(tag)
+root_cmd = 'root -l -b -q macro/Make_BDT_histograms.cxx\'(%s)\''%(root_arg)
+os.system(root_cmd)
+
+

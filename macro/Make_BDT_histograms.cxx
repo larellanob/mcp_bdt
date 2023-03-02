@@ -1,6 +1,6 @@
 void Make_BDT_histograms(TString model = "model_230123_normal_thresholds")
 {
-  bool fVerbose {true};
+  bool fVerbose {false};
   std::vector<int> masses {
     100,
     150,
@@ -13,7 +13,7 @@ void Make_BDT_histograms(TString model = "model_230123_normal_thresholds")
   for ( auto mass: masses ) {
     if ( fVerbose ) std::cout << "\n\n\n\nMass \n\n\n\n" << mass << std::endl;
     
-    TString filename = Form("root/%s/test_1000kev_2hits_%imev_BDT_scores.root",model.Data(),mass);
+    TString filename = Form("root/%s/test_BDT_scores_1000kev_2hits_%imev.root",model.Data(),mass);
     TFile *f = new TFile(filename);
     
     TTree* bkg_tree = (TTree*)f->Get("test_bkg");
@@ -26,7 +26,7 @@ void Make_BDT_histograms(TString model = "model_230123_normal_thresholds")
     bkg_tree->Draw("bdt>>bkg_hist");
     sig_tree->Draw("bdt>>sig_hist");
     
-    TFile outfile(Form("hist/%s/no_bdtcut_s_b_mass_%i.root",model.Data(),mass),"recreate");
+    TFile outfile(Form("root/%s/hist_bdtscore_nocut_%imev.root",model.Data(),mass),"recreate");
     // save the histograms, not the trees
     bkg_hist->Write();
     sig_hist->Write();
