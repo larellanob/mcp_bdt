@@ -321,6 +321,7 @@ with uproot.recreate(output_root_file) as f:
         f[sample[1]] = branches
 
 masses = [100,150,200,300,350,400]
+out_test_files = []
 
 for m in masses:
     print("MASS:",m)
@@ -363,6 +364,7 @@ for m in masses:
 
 
     out_test_file = 'root/%s/test_BDT_scores_%skev_%shits_%smev.root'%(tag,gen_th,nhits,m)
+    out_test_files.append(out_test_file)
     print("saving file",out_test_file)
     with uproot.recreate(out_test_file) as f2:
         for sample in samples:
@@ -380,10 +382,10 @@ for m in masses:
             f2[sample[1]] = branches
 
             
-
+print(out_test_files)
 # Make_BDT_histograms.cxx already loops over masses
-root_arg = '"%s"'%(tag)
-root_cmd = 'root -l -b -q macro/Make_BDT_histograms.cxx\'(%s)\''%(root_arg)
-os.system(root_cmd)
+for tf in out_test_files:
+    root_cmd = 'root -l -b -q macro/Make_BDT_histograms.cxx\'("%s")\''%(tf)
+    os.system(root_cmd)
 
 

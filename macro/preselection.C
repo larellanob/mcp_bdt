@@ -1,6 +1,6 @@
 void preselection(const char* fn = "spacepoints_mc.root") {
   TFile *f = new TFile(fn);
-  TTree *t = (TTree*)f->Get("t");
+  TTree *t = (TTree*)f->Get("ana/t");
   int run,  evt;
   t->SetBranchAddress("run",&run);
   t->SetBranchAddress("evt",&evt);
@@ -27,8 +27,27 @@ void preselection(const char* fn = "spacepoints_mc.root") {
     output_filename.ReplaceAll("spacepoints","preselection");
   }
   std::cout << output_filename << std::endl;
-
+  
   TFile *of = new TFile(output_filename,"recreate");
+
+  // POT and normalization from spacepoints file
+  TTree *pot_tree = (TTree*)f->Get("ana/pottree");
+  TTree *o_pot_tree = new TTree("total_pot","total pot and events from sample");
+  double tot_pot = 0;
+  double pot = 0;
+  double totevents = t->GetEntries();
+  pot_tree->SetBranchAddress("totpot",&pot);
+  for(int ievent = 0; ievent < pot_tree->GetEntries(); ++ievent) {
+    pot_tree->GetEntry(ievent);
+    tot_pot += pot;
+  }
+  std::cout << "tot_pot " << tot_pot << std::endl;
+  auto b_pot = o_pot_tree->Branch("tot_pot",&tot_pot);
+  auto b_evt = o_pot_tree->Branch("tot_evt",&totevents);
+  o_pot_tree->Fill();
+  o_pot_tree->Write();
+
+  // events from spacepoints file
   TTree *ot1a = new TTree("tbg_train","background training");
   TTree *ot2a = new TTree("tsig_train","signal training");
   TTree *ot1b = new TTree("tbg_test","background");
@@ -333,4 +352,5 @@ void preselection(const char* fn = "spacepoints_mc.root") {
   }
   delete of;
   delete f;
+  std::cout << "Saved file " << output_filename << std::endl;
 }

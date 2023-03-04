@@ -17,8 +17,6 @@ tag_mass  = "%s_%skev_%shits_%smev"%(fcl_th,gen_th,nhits,mass)
 tag   = "%s_%skev_%shits"%(fcl_th,gen_th,nhits)
 model = "%s_230301"%(tag)
 detvar_dir = "systematics/detvar_%s_v08_00_00_61"%(tag_mass)
-presel_dir = "systematics/detvar_%s_v08_00_00_61/preselection"%(tag_mass)
-print(presel_dir)
 
 detvars = [ 'CV',
             'wiremod_x',
@@ -41,7 +39,7 @@ for line in featmap_file:
 print(featmap_list)
 
 for detvar in detvars:
-    detvar_file = '%s/presel_%s.root'%(presel_dir,detvar)
+    detvar_file = '%s/preselection_%s.root'%(detvar_dir,detvar)
     detvar_uproot = uproot.open(detvar_file)
     bdt_test = xgb.Booster()
     bdt_test.load_model("models/%s_model.json"%(model))
@@ -75,7 +73,7 @@ for detvar in detvars:
         (xgb_test_bkg2,'test_bkg',detvar_uproot['tbg_test'].arrays(["run","evt"],library="pd"))
     ]
                    
-    out_test_file = '%s/hist/test_BDT_scores_%s.root'%(detvar_dir,detvar)
+    out_test_file = '%s/test_BDT_scores_%s.root'%(detvar_dir,detvar)
     print("saving file",out_test_file)
 
     with uproot.recreate(out_test_file) as f2:
@@ -92,4 +90,8 @@ for detvar in detvars:
             branches['bdt'] = prediction
             
             f2[sample[1]] = branches
+
+    # make bdt root histograms
+    root_cmd = 'root -l -b -q macro/Make_BDT_histograms.cxx\'("%s")\''%out_test_file
+    os.system('root -l -b -q macro/Make_BDT_histograms.cxx\'("%s")\''%out_test_file)
     
