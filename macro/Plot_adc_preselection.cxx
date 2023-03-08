@@ -3,20 +3,19 @@ void Plot_adc_preselection(TString filename)
   int threshold {1000};
   int nhits {2};
   int mass {100};
-  TObjArray *tok = filename.Tokenize("_");
+  TString outdir;
+  TString outfile;
+  TObjArray *tok = filename.Tokenize("/");
   for ( int i = 0; i < tok->GetEntries(); i++ ) {
     TString t = ((TObjString*)(tok->At(i)))->String();
-    if ( t.Contains("kev") ) {
-      t.ReplaceAll("kev","");
-      threshold = t.Atoi();
-    } else if ( t.Contains("hits") ) {
-      t.ReplaceAll("hits","");
-      nhits = t.Atoi();
-    } else if ( t.Contains("mev") ) {
-      t.ReplaceAll("mev","");
-      mass = t.Atoi();
-    }
+    if ( i < tok->GetEntries()-1 ) outdir += (t+"/");
+    if ( i == tok->GetEntries()-1 ) outfile = t;
   }
+  outdir.ReplaceAll("root","img");
+  outdir.ReplaceAll("systematics","img");
+  outfile.ReplaceAll(".root",".pdf");
+  outfile.ReplaceAll("spacepoints","spacepoints_adc");
+  std::cout << "outdir, outfile " << outdir << " " << outfile << std::endl;
   //TString filename = Form("root/model_%s/spacepoints_%ikev_%ihits_%imev.root",model.Data(),threshold,nhits,mass);
   TFile *f = new TFile(filename);
   //TH2F * full_angles = new TH2F("full_angles",
@@ -41,11 +40,8 @@ void Plot_adc_preselection(TString filename)
   TLegend *myleg = new TLegend();
   myleg = c1->BuildLegend(0.1,0.7,0.3,0.9,"","");
 
-  if ( mass != 0 ) {
-    c1->SaveAs(Form("img/Plane_integrals_%ikeV_%ihits_%iMeV.pdf",threshold,nhits,mass));
-  } else if ( mass == 0 ) {
-    c1->SaveAs(Form("img/Plane_integrals_%ikeV_%ihits_combinedmass.pdf",threshold,nhits));
-  }
+  gSystem->Exec("mkdir -p "+outdir);
+  c1->SaveAs(outdir+outfile);
 
   std::cout << "calculating best sensitivity" << std::endl;
   double range_bkg = 0;
