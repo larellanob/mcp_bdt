@@ -1,6 +1,11 @@
 void preselection(const char* fn = "spacepoints_mc.root") {
   TFile *f = new TFile(fn);
   TTree *t = (TTree*)f->Get("ana/t");
+  if ( t == nullptr ) {
+    std::cout << "WARNING: using old gallery script instead of analyzer\n"
+	      << "No POT information will be saved" << std::endl;
+    t  = (TTree*)f->Get("t");
+  }
   int run,  evt;
   t->SetBranchAddress("run",&run);
   t->SetBranchAddress("evt",&evt);
@@ -36,10 +41,12 @@ void preselection(const char* fn = "spacepoints_mc.root") {
   double tot_pot = 0;
   double pot = 0;
   double totevents = t->GetEntries();
-  pot_tree->SetBranchAddress("totpot",&pot);
-  for(int ievent = 0; ievent < pot_tree->GetEntries(); ++ievent) {
-    pot_tree->GetEntry(ievent);
-    tot_pot += pot;
+  if ( pot_tree != nullptr ) {
+    pot_tree->SetBranchAddress("totpot",&pot);
+    for(int ievent = 0; ievent < pot_tree->GetEntries(); ++ievent) {
+      pot_tree->GetEntry(ievent);
+      tot_pot += pot;
+    }
   }
   std::cout << "tot_pot " << tot_pot << std::endl;
   auto b_pot = o_pot_tree->Branch("tot_pot",&tot_pot);

@@ -92,6 +92,7 @@ for detvar in detvars:
             f2[sample[1]] = branches
 
     # make bdt root histograms
-    root_cmd = 'root -l -b -q macro/Make_BDT_histograms.cxx\'("%s")\''%out_test_file
-    os.system('root -l -b -q macro/Make_BDT_histograms.cxx\'("%s")\''%out_test_file)
-    
+    os.system('root -l -b -q macro/Make_BDT_histograms.cxx\'("%s","%s")\''%(out_test_file,detvar))
+
+print("Getting detvar ratios")
+os.system('root -l -b -q macro/Get_detvar_ratios.cxx\'("%s")\''%detvar_dir)

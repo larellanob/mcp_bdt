@@ -1,4 +1,4 @@
-void Make_BDT_histograms(TString filename)
+void Make_BDT_histograms(TString filename,TString detvar="")
 {
   if ( !filename.Contains("test") ) {
     std::cout << "Incorrect input file, needs to be test_ type" << std::endl;
@@ -39,9 +39,13 @@ void Make_BDT_histograms(TString filename)
   sig_hist->Write();
   
   TCanvas c3;
+  gStyle->SetOptStat(0);
   TH1F *h_base = new TH1F("h_base","Test BDT bkg;Score;Entries",40,-10,10);
   h_base->Draw();
   h_base->SetTitle(Form("Mass %i MeV BDT score;BDT score;Entries",mass));
+  if ( detvar != "" ) {
+    h_base->SetTitle(Form("%iMeV - %s;BDT score;Entries",mass,detvar.Data()));
+  }
   h_base->SetMaximum(std::max(sig_hist->GetMaximum(),bkg_hist->GetMaximum())*1.1);
   bkg_hist->SetLineColor(kRed);
   sig_hist->SetLineColor(kBlue);
