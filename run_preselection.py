@@ -5,8 +5,8 @@ import os
 
 def preselection(f):
     os.system('root -l -b -q macro/preselection.C\'("%s")\''%f)
+    os.system('root -l -b -q macro/Plot_adc_preselection.cxx\'("%s")\''%f)
     
-
 # three run modes, single file, masses, systematics
 
 masses = [ 100, 150, 200, 300, 350, 400 ]
@@ -29,11 +29,15 @@ if len(sys.argv) > 1:
     if arg.endswith('.root'):
         preselection(arg)
         exit()
-    elif "detvar" in arg:
+    elif "detvar" in arg: # systematics
+        print("running dir %s for all detvars"%(arg))
         for dv in detvars:
             preselection("systematics/%s/spacepoints_%s.root"%(arg,dv))
-    elif "mev" in arg:
+    elif ".root" in arg: # single file
+        print("running single file %s"%(arg))
+        preselection("root/%s"%(arg))
+    else:   # assume running dataset for all masses
+        print("running dir %s for all mass points"%(arg))
         for m in masses:
             preselection("root/%s/spacepoints_%smev.root"%(arg,m))
-    else:
-        preselection("root/%s/spacepoints_%s.root"%(arg,arg))
+            
