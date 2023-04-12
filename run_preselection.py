@@ -18,7 +18,9 @@ detvars = [ 'CV',
             'wiremod_dEdx',
             'ly_down',
             'ly_rayleigh',
-            'ly_atten'
+            'ly_atten',
+            'sce',
+            'recomb'
            ]
 
 

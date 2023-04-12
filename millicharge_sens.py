@@ -8,12 +8,13 @@ from pyhf.contrib.viz import brazil
 import uproot
 import scipy.stats as stats
 import math
+import pathlib
 
 # runs 1+2+3
 data_pot = 1.5e21
 data_eve = 3081362.
 
-'''
+
 # normal thresholds
 def get_scaling(mass):
     # returns sig scaling, bkg scaling
@@ -44,7 +45,8 @@ def get_scaling(mass):
     return pot_runs123/float(pot),eve_runs123/float(eve)
 
 '''
-# low thresholds    
+# low thresholds
+
 def get_scaling(mass):
     # returns sig scaling, bkg scaling
     eve = 0
@@ -72,29 +74,56 @@ def get_scaling(mass):
     else:
         return 0
     return pot_runs123/float(pot),eve_runs123/float(eve)
+'''
 
+def detector_systematics(sig_or_bkg, mass):
+    # detector variations only make sense compared to CV
+    # so need to do everything in relation to that
+    detvars_list = [] # return this
+    detvars_names = [
+        "CV",
+        "wiremod_x",
+        "wiremod_yz",
+        "wiremod_anglexz",
+        "wiremod_angleyz",
+        "wiremod_dEdx",
+        "ly_down",
+        "ly_rayleigh",
+        "ly_atten",
+        "sce",
+        "recomb"
+        ]
 
-def get_limit(mass):
+    detvars_dict = {}
+    
+    ratios_root_file = 'systematics/detvar_def-th_1000kev_2hits_%imev_v08_00_00_61/Quadrature_%s.root'%(mass,sig_or_bkg)
+
+    ur = uproot.open(ratios_root_file)
+    for dv in detvars_names:
+        try:
+            detvars_list.append(ur[dv].values().tolist())
+            detvars_dict[dv] = ur[dv].values().tolist()
+        except:
+            print("No histogram found for detvar",dv)
+            detvars_dict[dv] = []
+    
+    return detvars_dict
+    
+    
+    # must return histogram of percentages or whatever
+
+def get_limit(directory, filename, mass):
     print("\nSensitivity for mass %.1f"%(mass))
 
-    bdt_cuts = True
-    # with bdt cuts
-    if bdt_cuts:
-        input_root_file = '../hist/post_bdtcut_s_b_mass_%i.root'%(mass)
-    # no bdt cuts
-    if not bdt_cuts:
-        input_root_file = '../hist/no_bdtcut_s_b_mass_%i.root'%(mass)
+    #input_root_file = '../root/post_bdtcut_s_b_mass_%i.root'%(mass)
+    input_root_file = directory+filename
     uprooted = uproot.open(input_root_file)
 
     print(uprooted)
     print(uprooted.keys())
 
-    if bdt_cuts:
-        sig = uprooted['sig_cut']
-        bkg = uprooted['bkg_cut']
-    if not bdt_cuts:
-        sig = uprooted['sig_hist']
-        bkg = uprooted['bkg_hist']
+    sig = uprooted['sig_hist']
+    bkg = uprooted['bkg_hist']
 
     # from nupy arrays to python list
     # would be better if you made pyhf read numpy arrays?
@@ -116,8 +145,8 @@ def get_limit(mass):
     sig_bins = [ i * sig_scale for i in sig_bins ]
     bkg_bins = [ i * bkg_scale for i in bkg_bins ]
 
-    sig_bins = [ i * 7./3. for i in sig_bins ]
-    bkg_bins = [ i * 7./3. for i in bkg_bins ]
+    sig_bins = [ i * 10./3. for i in sig_bins ]
+    bkg_bins = [ i * 10./3. for i in bkg_bins ]
     
     err_bins = [ math.sqrt(i) for i in bkg_bins ]
     
@@ -237,13 +266,13 @@ def get_limit(mass):
     #poi_values = np.linspace(0.1, 5, 50)
     #poi_values = np.linspace(5000, 10000000, 50)
 
-    poi_values = np.linspace(1000, 25000, 100)
+    poi_values = np.linspace(1000, 100000, 100)
     if mass == 200:
-        poi_values = np.linspace(1000, 30000, 100)
+        poi_values = np.linspace(1000, 150000, 100)
     if mass == 300:
-        poi_values = np.linspace(1000, 100000, 100)
+        poi_values = np.linspace(1000, 350000, 100)
     if mass == 350:
-        poi_values = np.linspace(5000, 1000000, 100)
+        poi_values = np.linspace(5000, 800000, 100)
     if mass == 400:
         poi_values = np.linspace(5000, 20000000, 100)
 
@@ -267,13 +296,11 @@ def get_limit(mass):
     save = True
     show = False
     #model_tag = "230123_normal_thresholds"
-    model_tag = "221207_combinedmass_pot"
+    model_tag = directory.replace("root","img")
     if save:
         print("\nSaving plot")
-        if bdt_cuts:
-            plt.savefig("../img/model_%s/limit_mass_%i_cl_%i_cuts.pdf"%(model_tag,mass,cl))
-        if not bdt_cuts:
-            plt.savefig("../img/model_%s/limit_mass_%i_cl_%i.pdf"%(model_tag,mass,cl))
+        pathlib.Path(model_tag).mkdir(parents=True,exist_ok=True)
+        plt.savefig("%s/limit_mass_%i_cl_%i.pdf"%(model_tag,mass,cl))
     if show:
         print("\nShowing plot")
         plt.show()
@@ -284,8 +311,16 @@ obs_limits = []
 exp_limits = []
 #mass = masses[4]
 
+detvars_dict = detector_systematics("signal",200)
+print("Printing list")
+for dv in detvars_dict:
+    print(dv,detvars_dict[dv],"\n")
+exit()
+
 for m in masses:
-    o_l, e_l = get_limit(m)
+    directory = "root/def-th_1000kev_2hits/"
+    filename = "hist_BDT_scores_1000kev_2hits_%imev.root"%m
+    o_l, e_l = get_limit(directory,filename,m)
     obs_limits.append(o_l)
     exp_limits.append(e_l)
 
