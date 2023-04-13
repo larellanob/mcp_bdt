@@ -106,11 +106,15 @@ def detector_systematics(sig_or_bkg, mass):
         except:
             print("No histogram found for detvar",dv)
             detvars_dict[dv] = []
-    
+
+    # returns dictionary of samples : histograms (list of bin values)
     return detvars_dict
-    
-    
-    # must return histogram of percentages or whatever
+
+def detector_systematics_sigbkg(mass):
+    # calls previous, returns both
+    sig_syst = detector_systematics("signal",mass)
+    bkg_syst = detector_systematics("background",mass)
+    return sig_syst,bkg_syst
 
 def get_limit(directory, filename, mass):
     print("\nSensitivity for mass %.1f"%(mass))
@@ -178,12 +182,44 @@ def get_limit(directory, filename, mass):
         bkg=bkg_bins,
         bkg_uncertainty=err_bins
     )
-
+    
     print("\nWe have a model of type")
     print(type(model))
 
-    # dump the entire json model
-    #print(json.dumps(model.spec,indent=2))
+    print("dumping the entire json model")
+    print(json.dumps(model.spec,indent=2))
+
+    ## systematics
+    sig_syst, bkg_syst = detector_systematics_sigbkg(mass)
+
+    for dv in sig_syst:
+        # when looping over a dict you're looping over the keys
+        if dv == 'CV':
+            continue
+        data = model.spec['channels'][0]['samples'][0]['data']
+        absolute = []
+        for i in range(0,len(data)):
+            absolute.append(data[i]*sig_syst[dv][i])
+        #new_entry = {'name':dv,'type':'shapesys', 'data': absolute}
+        new_entry = {'name':dv,'type':'shapesys', 'data': sig_syst[dv]}
+        model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
+
+    for dv in bkg_syst:
+        # when looping over a dict you're looping over the keys
+        if dv == 'CV':
+            continue
+        data = model.spec['channels'][0]['samples'][1]['data']
+        absolute = []
+        for i in range(0,len(data)):
+            absolute.append(data[i]*sig_syst[dv][i])
+        #new_entry = {'name':dv,'type':'shapesys', 'data': absolute}
+        new_entry = {'name':dv,'type':'shapesys', 'data': sig_syst[dv]}
+        model.spec['channels'][0]['samples'][1]['modifiers'].append(new_entry)
+    
+    print("dumping the entire json model")
+    print(json.dumps(model.spec,indent=2))
+
+    #exit()
 
     nbins = model.config.channel_nbins['singlechannel']
     print("\nNumber of bins:",nbins)
@@ -315,7 +351,7 @@ detvars_dict = detector_systematics("signal",200)
 print("Printing list")
 for dv in detvars_dict:
     print(dv,detvars_dict[dv],"\n")
-exit()
+#exit()
 
 for m in masses:
     directory = "root/def-th_1000kev_2hits/"

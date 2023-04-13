@@ -12,7 +12,7 @@ import numpy.ma as ma # masked numpy arrays, to remove invalid data
 fcl_th = "def-th"
 gen_th = "1000"
 nhits  = "2"
-mass   = "350"
+mass   = "400"
 tag_mass  = "%s_%skev_%shits_%smev"%(fcl_th,gen_th,nhits,mass)
 tag   = "%s_%skev_%shits"%(fcl_th,gen_th,nhits)
 model = "%s_230301"%(tag)
