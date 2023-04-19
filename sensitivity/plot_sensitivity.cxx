@@ -29,7 +29,7 @@ void plot_sensitivity(int threshold = 1000)
 
   // own limits
   //const char* dir_sim = Form("/uboone/app/users/arellano/bdt_mcp/mass_scan/sensitivity_2206_with_milliqan/simulated/%ikev/",threshold);
-  const char* dir_sim = Form("./own_limits/");
+  const char* dir_sim = Form("./limits_apr_23/");
   std::vector<TGraph *> tgraphs_sim;
   std::cout << "fill 2 " << std::endl;
   fill_tgraph_vector(dir_sim,tgraphs_sim);
@@ -166,8 +166,8 @@ void fill_tgraph_vector(TString dir,   std::vector<TGraph *> &tgraphs)
     if ( experiments[exp].Contains("3hits") ) { nhits = 3; }
     if ( experiments[exp].Contains("4hits") ) { nhits = 4; }
     if ( nhits != 1 ) { tgraphs[exp]->SetTitle(Form("%.0f hits",nhits)); }
-    if ( experiments[exp].Contains("normal") ) { tgraphs[exp]->SetTitle("#muBooNE normal thresholds (x 7/3 correction)"); }
-    if ( experiments[exp].Contains("lowth") ) { tgraphs[exp]->SetTitle("#muBooNE low thresholds"); }
+    if ( experiments[exp].Contains("no-syst") ) { tgraphs[exp]->SetTitle("#muBooNE normal thresholds (no systematics)"); }
+    if ( experiments[exp].Contains("with-bkg-syst") ) { tgraphs[exp]->SetTitle("#muBooNE normal thresholds (with bkg quadrature"); }
     if ( experiments[exp].Contains("limit") ) { tgraphs[exp]->SetTitle(Form("%.0f hits (limit)",nhits)); }
     std::cout << Form("using %.0f hits", nhits) << std::endl;
     for ( int point = 0; point < experimentsx[exp].size(); point++ ){

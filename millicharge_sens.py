@@ -76,23 +76,26 @@ def get_scaling(mass):
     return pot_runs123/float(pot),eve_runs123/float(eve)
 '''
 
-def detector_systematics(sig_or_bkg, mass):
+def detector_systematics(sig_or_bkg, mass,detvars="detvars"):
     # detector variations only make sense compared to CV
     # so need to do everything in relation to that
     detvars_list = [] # return this
-    detvars_names = [
-        "CV",
-        "wiremod_x",
-        "wiremod_yz",
-        "wiremod_anglexz",
-        "wiremod_angleyz",
-        "wiremod_dEdx",
-        "ly_down",
-        "ly_rayleigh",
-        "ly_atten",
-        "sce",
-        "recomb"
+    if detvars == "detvars":
+        detvars_names = [
+            "CV",
+            "wiremod_x",
+            "wiremod_yz",
+            "wiremod_anglexz",
+            "wiremod_angleyz",
+            "wiremod_dEdx",
+            "ly_down",
+            "ly_rayleigh",
+            "ly_atten",
+            "sce",
+            "recomb"
         ]
+    else:
+        detvars_names = ["quadrature"]
 
     detvars_dict = {}
     
@@ -114,6 +117,12 @@ def detector_systematics_sigbkg(mass):
     # calls previous, returns both
     sig_syst = detector_systematics("signal",mass)
     bkg_syst = detector_systematics("background",mass)
+    return sig_syst,bkg_syst
+
+def detector_systematics_quadrature(mass):
+    # calls previous, returns both
+    sig_syst = detector_systematics("signal",mass,detvars="quadrature")
+    bkg_syst = detector_systematics("background",mass,detvars="quadrature")
     return sig_syst,bkg_syst
 
 def get_limit(directory, filename, mass):
@@ -190,8 +199,10 @@ def get_limit(directory, filename, mass):
     print(json.dumps(model.spec,indent=2))
 
     ## systematics
-    sig_syst, bkg_syst = detector_systematics_sigbkg(mass)
+    #sig_syst, bkg_syst = detector_systematics_sigbkg(mass) # 8 hours for same result
+    sig_syst, bkg_syst = detector_systematics_quadrature(mass)
 
+    '''
     for dv in sig_syst:
         # when looping over a dict you're looping over the keys
         if dv == 'CV':
@@ -199,26 +210,30 @@ def get_limit(directory, filename, mass):
         data = model.spec['channels'][0]['samples'][0]['data']
         absolute = []
         for i in range(0,len(data)):
-            absolute.append(data[i]*sig_syst[dv][i])
-        #new_entry = {'name':dv,'type':'shapesys', 'data': absolute}
-        new_entry = {'name':dv,'type':'shapesys', 'data': sig_syst[dv]}
+            absolute.append(abs(data[i]*sig_syst[dv][i]))
+        new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': absolute}
+        #new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': sig_syst[dv]}
         model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
-
+    '''
     for dv in bkg_syst:
+        print(dv)
         # when looping over a dict you're looping over the keys
         if dv == 'CV':
             continue
         data = model.spec['channels'][0]['samples'][1]['data']
         absolute = []
         for i in range(0,len(data)):
-            absolute.append(data[i]*sig_syst[dv][i])
-        #new_entry = {'name':dv,'type':'shapesys', 'data': absolute}
-        new_entry = {'name':dv,'type':'shapesys', 'data': sig_syst[dv]}
+            print(data[i],sig_syst[dv][i],data[i]*sig_syst[dv][i])
+            absolute.append(abs(data[i]*sig_syst[dv][i]))
+        new_entry = {'name':dv+"_bkg",'type':'shapesys', 'data': absolute}
         model.spec['channels'][0]['samples'][1]['modifiers'].append(new_entry)
     
     print("dumping the entire json model")
     print(json.dumps(model.spec,indent=2))
 
+    # remodel including systematics
+    model = pyhf.Model(model.spec)
+        
     #exit()
 
     nbins = model.config.channel_nbins['singlechannel']
@@ -268,6 +283,7 @@ def get_limit(directory, filename, mass):
     print(type(lp))
     print(lp)
 
+    '''
     print("\nFit")
     #np.seterr(divide = 'ignore')
     fit = pyhf.infer.mle.fit(data=observations,pdf=model)
@@ -292,10 +308,11 @@ def get_limit(directory, filename, mass):
     print(f"      Observed CLs: {CLs_obs:.4f}")
     for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
         print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.4f}")
-
+    '''
+    
     # need pyhf version >= 0.7.0 for pyhf.infer.intervals.upper_limits
     print("\npyhf version:",pyhf.__version__)
-    
+
     # confidence level
     cl = 90.
     alpha = round(1-0.01*cl,2)
