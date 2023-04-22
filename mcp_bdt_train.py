@@ -331,6 +331,8 @@ for m in masses:
     print("opened file",test_file)
     test_uproot = uproot.open(test_file)
 
+    print(test_uproot)
+    
     bdt_test = xgb.Booster()
     bdt_test.load_model("models/%s_model.json"%(model))
 
@@ -351,16 +353,12 @@ for m in masses:
     xgb_test_sig2 = xgb.DMatrix(sig_test)
     xgb_test_bkg2 = xgb.DMatrix(bkg_test)
 
-    #l_bkg=[0]*len(bkg_test)
-    #l_sig=[1]*len(sig_test)
-    #xgb_test_bkg2.set_label(l_bkg)
-    #xgb_test_sig2.set_label(l_sig)
 
-    samples = watchlist
-    samples[0] += (test_uproot['tsig_train'].arrays(["run","evt"],library="pd"),)
-    samples[1] += (test_uproot['tbg_train'].arrays(["run","evt"],library="pd"),)
-    samples[2] += (test_uproot['tsig_test'].arrays(["run","evt"],library="pd"),)
-    samples[3] += (test_uproot['tbg_test'].arrays(["run","evt"],library="pd"),)
+    samples = [ (xgb_test_sig2,'test_sig'),
+                (xgb_test_bkg2,'test_bkg')]
+    # tuple adding (appending as last element)
+    samples[0] += (test_uproot['tsig_test'].arrays(["run","evt"],library="np"),)
+    samples[1] += (test_uproot['tbg_test'].arrays(["run","evt"],library="np"),)
 
 
     out_test_file = 'root/%s/test_BDT_scores_%skev_%shits_%smev.root'%(tag,gen_th,nhits,m)
@@ -371,12 +369,14 @@ for m in masses:
             # sample[0] is the DMatrix
             # sample[1] is the string
             prediction = bdt.predict(sample[0], output_margin=True)
-            
+
+            # sample[2] are the new elements, run and evt
+            # not a part of the training but might be useful when testing
             # branches which will go in the file are input from dictionary
             # they get added backwards for some reason
             branches = {}
-            branches['run'] = sample[2]['run'].to_numpy()
-            branches['evt'] = sample[2]['evt'].to_numpy()
+            branches['run'] = sample[2]['run']
+            branches['evt'] = sample[2]['evt']
             branches['bdt'] = prediction
             
             f2[sample[1]] = branches
