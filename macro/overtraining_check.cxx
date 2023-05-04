@@ -1,7 +1,10 @@
 //void Plot_BDT(TString model = "test_model_221116_combinedmass_workshop")
-void overtraining_check(TString model = "model_230123_normal_thresholds", TString test_model = "")
+void overtraining_check(TString tag = "def-th_1000kev_2hits",
+			TString model = "230424",
+			TString test_model = "")
 {
-  TFile *f = new TFile(Form("root/%s_BDT_scores.root",model.Data()));
+  gStyle->SetOptStat(0);
+  TFile *f = new TFile(Form("root/%s/%s_%s_BDT_scores.root",tag.Data(),tag.Data(),model.Data()));
 
   int test_mass;
   if ( test_model.IsDigit() ) {
@@ -23,13 +26,13 @@ void overtraining_check(TString model = "model_230123_normal_thresholds", TStrin
   // tsig_train
   // tsig_test
   auto c1 = new TCanvas();
-  TH1F *h0 = new TH1F("h0","Test BDTs;Score;Entries",40,-6,6);
-  TH1F *h1 = new TH1F("h1","Test BDTs;Score;Entries",40,-6,6);
-  TH1F *h2 = new TH1F("h2","Test BDTs;Score;Entries",40,-6,6);
-  TH1F *h3 = new TH1F("h3","Train bkg;Score;Entries",40,-6,6);
-  TH1F *h4 = new TH1F("h4","Train sig;Score;Entries",40,-6,6);
-  TH1F *h5 = new TH1F("h5","Train sig;Score;Entries",40,-6,6); // bkg_nu
-  TH1F *h6 = new TH1F("h6","Train sig;Score;Entries",40,-6,6); // bkg_nu cosmics
+  TH1F *h0 = new TH1F("h0","Test BDTs;Score;Entries",40,-10,10);
+  TH1F *h1 = new TH1F("h1","Test BDTs;Score;Entries",40,-10,10);
+  TH1F *h2 = new TH1F("h2","Test BDTs;Score;Entries",40,-10,10);
+  TH1F *h3 = new TH1F("h3","Train bkg;Score;Entries",40,-10,10);
+  TH1F *h4 = new TH1F("h4","Train sig;Score;Entries",40,-10,10);
+  TH1F *h5 = new TH1F("h5","Train sig;Score;Entries",40,-10,10); // bkg_nu
+  TH1F *h6 = new TH1F("h6","Train sig;Score;Entries",40,-10,10); // bkg_nu cosmics
 
   
   TTree* bkg = (TTree*)f->Get("test_bkg");
@@ -51,7 +54,7 @@ void overtraining_check(TString model = "model_230123_normal_thresholds", TStrin
     f->cd();
   }
 
-  h0->SetMaximum(1400);
+  h0->SetMaximum(14000);
   h0->Draw();
   if ( bkg_nu ) {
     std::cout << "doing nu" << std::endl;
@@ -76,7 +79,9 @@ void overtraining_check(TString model = "model_230123_normal_thresholds", TStrin
   bkg_train->Draw("bdt>>h3","","P same");
   sig->Draw("bdt>>h2","","hist same");
   sig_train->Draw("bdt>>h4","","P same");
-  
+  double max1 = std::max(h1->GetMaximum(),h3->GetMaximum()*(3./7.));
+  double max2 = std::max(h2->GetMaximum(),h4->GetMaximum()*(3./7.));
+  h0->SetMaximum(std::max(max1,max2)*1.1);
 
   //h1->SetMaximum(1400);
   h3->SetMarkerStyle(kFullTriangleDown);
@@ -88,7 +93,7 @@ void overtraining_check(TString model = "model_230123_normal_thresholds", TStrin
   h4->SetMarkerStyle(kFullTriangleUp);
   h4->SetMarkerColor(kBlue);
 
-    h4->Scale(3/7.);
+  h4->Scale(3/7.);
   h4->SetTitle("Millicharge (Train, scaled 3/7.)");
 
   h1->SetTitle("Blips from overlay (Test)");
@@ -99,8 +104,10 @@ void overtraining_check(TString model = "model_230123_normal_thresholds", TStrin
   h1->SetTitle("Test BDTs");
   if ( test_model != "" ) {
     c1->SaveAs(Form("img/%s/%s_BDT_score.pdf",model.Data(),test_model.Data()));
+    c1->SaveAs(Form("img/%s/%s_BDT_score.png",model.Data(),test_model.Data()));
   } else {
-    c1->SaveAs(Form("img/%s/%s_BDT_score.pdf",model.Data(),model.Data()));
+    c1->SaveAs(Form("img/%s/%s_BDT_score.pdf",tag.Data(),model.Data()));
+    c1->SaveAs(Form("img/%s/%s_BDT_score.png",tag.Data(),model.Data()));
   }
     
   

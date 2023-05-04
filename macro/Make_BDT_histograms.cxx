@@ -20,6 +20,11 @@ void Make_BDT_histograms(TString filename,TString detvar="")
 
   
   TFile *f = new TFile(filename);
+
+  TTree *pot;
+  if ( detvar == "" ) {
+    pot = (TTree*)f->Get("total_pot");
+  }
   
   TTree* bkg_tree = (TTree*)f->Get("test_bkg");
   TTree* sig_tree = (TTree*)f->Get("test_sig");
@@ -37,7 +42,12 @@ void Make_BDT_histograms(TString filename,TString detvar="")
   // save the histograms, not the trees
   bkg_hist->Write();
   sig_hist->Write();
-  
+  TTree * newpottree;
+  if ( detvar == "" ) {
+    newpottree = pot->CloneTree();
+    newpottree->Write();
+  }
+    
   TCanvas c3;
   gStyle->SetOptStat(0);
   TH1F *h_base = new TH1F("h_base","Test BDT bkg;Score;Entries",40,-10,10);

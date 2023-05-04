@@ -86,6 +86,8 @@ void Plot_adc_preselection(TString filename)
 
   gSystem->Exec("mkdir -p "+outdir);
   c1->SaveAs(outdir+outfile);
+  outfile.ReplaceAll(".pdf",".png");
+  c1->SaveAs(outdir+outfile);
 
   std::cout << "calculating best sensitivity" << std::endl;
   double range_bkg = 0;

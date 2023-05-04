@@ -32,6 +32,10 @@ void preselection(const char* fn = "spacepoints_mc.root") {
     output_filename.ReplaceAll("spacepoints","preselection");
   }
   std::cout << output_filename << std::endl;
+  float train_fraction = 0.7;
+  if ( infile_compare.Contains("detvar") ) {
+    train_fraction = 0.0;
+  }
   
   TFile *of = new TFile(output_filename,"recreate");
 
@@ -171,6 +175,7 @@ void preselection(const char* fn = "spacepoints_mc.root") {
   map<int,map<int,bool>> istrain_map_sig;
   map<int,map<int,bool>> istrain_map_bg;
   TRandom3 rand;
+  /*
   auto is_train = [&rand](auto& istrain_map, const int run, const int evt, const double train_frac = 0.7) -> bool {
     auto r = istrain_map.find(run);
     if(r != istrain_map.end()) {
@@ -184,7 +189,7 @@ void preselection(const char* fn = "spacepoints_mc.root") {
     istrain_map[run][evt] = train;
     return train;
   };
-
+  */
   for(int ievent = 0; ievent < t->GetEntries(); ++ievent) {
     t->GetEntry(ievent);
     const bool has_truth = !true_xs->empty();
@@ -234,8 +239,8 @@ void preselection(const char* fn = "spacepoints_mc.root") {
       for(size_t jsps = isps+1; jsps < pxs->size(); ++jsps) {
         const double adc2 = adcs->at(jsps);
         if(adc2 < 100 || adc2 > 3630) continue;
-        const bool train_bg = rand.Uniform() < 0.7; //is_train(istrain_map_bg,run,evt,0.002);
-        const bool train_sig = rand.Uniform() < 0.7; //is_train(istrain_map_sig,run,evt,0.7);
+        const bool train_bg = rand.Uniform() < train_fraction; //is_train(istrain_map_bg,run,evt,0.002);
+        const bool train_sig = rand.Uniform() < train_fraction; //is_train(istrain_map_sig,run,evt,0.7);
         const double px2 = pxs->at(jsps);
         const double py2 = pys->at(jsps);
         const double pz2 = pzs->at(jsps);

@@ -14,6 +14,38 @@ import pathlib
 data_pot = 1.5e21
 data_eve = 3081362.
 
+use_systematics = True
+use_sig_syst = False
+if not use_systematics:
+    use_sig_syst = False
+use_flat_50p = True
+
+def get_CL_range(observations, model,unbounded_bounds,cl):
+
+    alpha = round(1-0.01*cl,2)
+    low_end  = 1000
+    high_end = 2000
+    obs_limit = 2000
+    iterations = 0
+    delta_iter = 1000
+    while obs_limit >= high_end:
+        iterations += 1
+        if iterations > 1:
+            delta_iter = iterations*10000
+            high_end   += delta_iter
+        poi_values = np.linspace(low_end,high_end,3)
+        obs_limit, exp_limits = pyhf.infer.intervals.upper_limits.upper_limit(
+            observations,model,poi_values,level=alpha,par_bounds=unbounded_bounds
+        )
+        print(iterations,"iterations")
+    #return np.linspace(low_end,2*high_end,10)
+    #lo_range = max(1000,obs_limit-obs_limit/2.)
+    lo_range = 1000.
+    if obs_limit > 10000:
+        lo_range = obs_limit-obs_limit/2.
+    up_range = obs_limit+obs_limit/2.
+    return np.linspace(lo_range,up_range,50)
+    
 
 # normal thresholds
 def get_scaling(mass):
@@ -144,7 +176,19 @@ def get_limit(directory, filename, mass):
 
     #sig_scale = get_sig_scaling(mass)
     #bkg_scale = get_bkg_scaling(mass)
-    sig_scale, bkg_scale = get_scaling(mass)
+    pot_tree = uprooted['total_pot']
+    npot = pot_tree["tot_pot"].array()[0]
+    nevt = pot_tree["tot_evt"].array()[0]
+    print("POT:",npot)
+    print("events:",nevt)
+
+    pot_runs123 = 1.5e21
+    eve_runs123 = 3081362.
+    sig_scale, bkg_scale = pot_runs123/float(npot),eve_runs123/float(nevt)
+    print(sig_scale,bkg_scale)
+
+    # we got rid of non-pot carrying trees
+    #sig_scale, bkg_scale = get_scaling(mass)
 
     print("\nData from the root file (before scaling): (s,b,b_err)")
     sig_bins = sig.values().tolist()
@@ -161,30 +205,12 @@ def get_limit(directory, filename, mass):
     sig_bins = [ i * 10./3. for i in sig_bins ]
     bkg_bins = [ i * 10./3. for i in bkg_bins ]
     
-    err_bins = [ math.sqrt(i) for i in bkg_bins ]
+    err_bins = [ math.sqrt(i) for i in bkg_bins ] # statisical error
     
-
-    '''
-    use only first n bins
-    n = 5
-    sig_bins = sig_bins[:n]
-    bkg_bins = bkg_bins[:n]
-    err_bins = err_bins[:n]
-    '''
-    # empty bins are being a problem
-    '''
-    print("\nSETTING ALL EMPTY BKG BINS TO 1")
-    for i in range(len(bkg_bins)):
-        if bkg_bins[i] == 0.:
-            bkg_bins[i] = 1.
-            err_bins[i] = 1.
-   '''
-
     print("\nData from the root file: (s,b,b_err)")
     print(sig_bins)
     print(bkg_bins)
     print(err_bins)
-
 
     model = pyhf.simplemodels.uncorrelated_background(
         signal=sig_bins,
@@ -202,7 +228,7 @@ def get_limit(directory, filename, mass):
     #sig_syst, bkg_syst = detector_systematics_sigbkg(mass) # 8 hours for same result
     sig_syst, bkg_syst = detector_systematics_quadrature(mass)
 
-    '''
+
     for dv in sig_syst:
         # when looping over a dict you're looping over the keys
         if dv == 'CV':
@@ -213,8 +239,10 @@ def get_limit(directory, filename, mass):
             absolute.append(abs(data[i]*sig_syst[dv][i]))
         new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': absolute}
         #new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': sig_syst[dv]}
-        model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
-    '''
+        if use_sig_syst:
+            model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
+            print("HHHHHHHHHHEEEEEEEEEEY, using signal systematics")
+
     for dv in bkg_syst:
         print(dv)
         # when looping over a dict you're looping over the keys
@@ -223,8 +251,12 @@ def get_limit(directory, filename, mass):
         data = model.spec['channels'][0]['samples'][1]['data']
         absolute = []
         for i in range(0,len(data)):
-            print(data[i],sig_syst[dv][i],data[i]*sig_syst[dv][i])
-            absolute.append(abs(data[i]*sig_syst[dv][i]))
+            print(data[i],bkg_syst[dv][i],data[i]*bkg_syst[dv][i])
+            if use_flat_50p:
+                absolute.append(abs(data[i]*0.5))
+            else:
+                absolute.append(abs(data[i]*bkg_syst[dv][i]))
+                print("BKG syst[i]:",i,bkg_syt[dv][i])
         new_entry = {'name':dv+"_bkg",'type':'shapesys', 'data': absolute}
         model.spec['channels'][0]['samples'][1]['modifiers'].append(new_entry)
     
@@ -232,7 +264,8 @@ def get_limit(directory, filename, mass):
     print(json.dumps(model.spec,indent=2))
 
     # remodel including systematics
-    model = pyhf.Model(model.spec)
+    if use_systematics:
+        model = pyhf.Model(model.spec)
         
     #exit()
 
@@ -246,7 +279,7 @@ def get_limit(directory, filename, mass):
     print("\nSuggested bounds:",model.config.suggested_bounds())
 
     unbounded_bounds = model.config.suggested_bounds()
-    unbounded_bounds[model.config.poi_index] = (0, 20000000)
+    unbounded_bounds[model.config.poi_index] = (0, 160000000)
 
     # background only expectation!
     # sig=0, bkg=1
@@ -263,18 +296,7 @@ def get_limit(directory, filename, mass):
     # observations = background only
     observations = bkg_bins + model.config.auxdata
 
-    '''
-    # randomize observations?
-    observations = []
-    for i in range(0,len(bkg_bins)):
-        pois = np.random.poisson(bkg_bins[i])
-        print(bkg_bins[i],pois)
-        observations.append(pois)
-    print(observations)
 
-    observations += model.config.auxdata
-    '''
-    
     print("\nObservations")
     print(observations)
 
@@ -283,32 +305,6 @@ def get_limit(directory, filename, mass):
     print(type(lp))
     print(lp)
 
-    '''
-    print("\nFit")
-    #np.seterr(divide = 'ignore')
-    fit = pyhf.infer.mle.fit(data=observations,pdf=model)
-    print(fit)
-    print("\u03BC\u0302 = ",fit[0])
-    print("\u03B3\u0302 = ",fit[1:])
-    # should I scale mu (signal strength) at this point?
-
-    # CLs
-    print("\nRunning CLs")
-    CLs_obs, CLs_exp = pyhf.infer.hypotest(
-        1.0, # null hypothesis "BSM physics process exists" (????)
-        # in pyhf documentation they call null hypothesis when you have full signal (mu = 1)
-        observations, 
-        model,
-        test_stat = "qtilde", # can use q or qtilde (?)
-        return_expected_set=True,
-    )
-
-    print(model.config.suggested_bounds()[model.config.poi_index])
-
-    print(f"      Observed CLs: {CLs_obs:.4f}")
-    for expected_value, n_sigma in zip(CLs_exp, np.arange(-2, 3)):
-        print(f"Expected CLs({n_sigma:2d} σ): {expected_value:.4f}")
-    '''
     
     # need pyhf version >= 0.7.0 for pyhf.infer.intervals.upper_limits
     print("\npyhf version:",pyhf.__version__)
@@ -318,20 +314,38 @@ def get_limit(directory, filename, mass):
     alpha = round(1-0.01*cl,2)
     #poi_values = np.linspace(0.1, 5, 50)
     #poi_values = np.linspace(5000, 10000000, 50)
+    # np.linspace(start, stop, number_of_evenly_spaced_samples=50)
 
-    poi_values = np.linspace(1000, 100000, 100)
-    if mass == 200:
-        poi_values = np.linspace(1000, 150000, 100)
-    if mass == 300:
-        poi_values = np.linspace(1000, 350000, 100)
-    if mass == 350:
-        poi_values = np.linspace(5000, 800000, 100)
-    if mass == 400:
-        poi_values = np.linspace(5000, 20000000, 100)
 
+    #  get_CL_range()
+    if use_systematics == True:
+        poi_values = np.linspace(1000, 300000, 50)
+        if mass == 150:
+            poi_values = np.linspace(1000, 500000, 50)
+        if mass == 200:
+            poi_values = np.linspace(1000, 150000, 50)
+        if mass == 300:
+            poi_values = np.linspace(1000, 350000, 50)
+        if mass == 350:
+            poi_values = np.linspace(5000, 800000, 50)
+        if mass == 400:
+            poi_values = np.linspace(5000, 20000000, 50)
+    elif use_systematics == False:
+        #poi_values = np.linspace(1000, 7000,500)
+        poi_values = np.linspace(1000, 12000,100)
+        if mass == 200:
+            poi_values = np.linspace(1000, 150000, 100)
+        if mass == 300:
+            poi_values = np.linspace(1000, 350000, 100)
+        if mass == 350:
+            poi_values = np.linspace(5000, 800000, 100)
+        if mass == 400:
+            poi_values = np.linspace(5000, 20000000, 100)
+            
     # comment for testing
     #return
-    
+
+    poi_values = get_CL_range(observations,model,unbounded_bounds,cl)
     print("\nGetting limit for mass",mass)
     obs_limit, exp_limits, (scan, results) = pyhf.infer.intervals.upper_limits.upper_limit(
         observations, model, poi_values, level=alpha, return_results=True, par_bounds=unbounded_bounds
@@ -353,13 +367,21 @@ def get_limit(directory, filename, mass):
     if save:
         print("\nSaving plot")
         pathlib.Path(model_tag).mkdir(parents=True,exist_ok=True)
-        plt.savefig("%s/limit_mass_%i_cl_%i.pdf"%(model_tag,mass,cl))
+        if use_systematics:
+            out_figname_pdf = "%s/limit_mass_%i_cl_%i.pdf"%(model_tag,mass,cl)
+            out_figname_png = "%s/limit_mass_%i_cl_%i.png"%(model_tag,mass,cl)
+        elif not use_systematics:
+            out_figname_pdf = "%s/limit_mass_%i_cl_%i_no-systematics.pdf"%(model_tag,mass,cl)
+            out_figname_png = "%s/limit_mass_%i_cl_%i_no-systematics.png"%(model_tag,mass,cl)
+        plt.savefig(out_figname_pdf)
+        plt.savefig(out_figname_png)        
     if show:
         print("\nShowing plot")
         plt.show()
     return obs_limit, exp_limits
 
 masses = [ 100.,150.,200.,300.,350.,400. ]
+#masses = [ 350. ]
 obs_limits = []
 exp_limits = []
 #mass = masses[4]
@@ -372,7 +394,7 @@ for dv in detvars_dict:
 
 for m in masses:
     directory = "root/def-th_1000kev_2hits/"
-    filename = "hist_BDT_scores_1000kev_2hits_%imev.root"%m
+    filename = "hist_BDT_scores_%imev.root"%m
     o_l, e_l = get_limit(directory,filename,m)
     obs_limits.append(o_l)
     exp_limits.append(e_l)

@@ -167,7 +167,8 @@ void fill_tgraph_vector(TString dir,   std::vector<TGraph *> &tgraphs)
     if ( experiments[exp].Contains("4hits") ) { nhits = 4; }
     if ( nhits != 1 ) { tgraphs[exp]->SetTitle(Form("%.0f hits",nhits)); }
     if ( experiments[exp].Contains("no-syst") ) { tgraphs[exp]->SetTitle("#muBooNE normal thresholds (no systematics)"); }
-    if ( experiments[exp].Contains("with-bkg-syst") ) { tgraphs[exp]->SetTitle("#muBooNE normal thresholds (with bkg quadrature"); }
+    if ( experiments[exp].Contains("with-bkg-syst") ) { tgraphs[exp]->SetTitle("#muBooNE normal thresholds (with bkg quadrature)"); }
+    if ( experiments[exp].Contains("full-syst") ) { tgraphs[exp]->SetTitle("#muBooNE normal thresholds (with full systematics)"); }
     if ( experiments[exp].Contains("limit") ) { tgraphs[exp]->SetTitle(Form("%.0f hits (limit)",nhits)); }
     std::cout << Form("using %.0f hits", nhits) << std::endl;
     for ( int point = 0; point < experimentsx[exp].size(); point++ ){

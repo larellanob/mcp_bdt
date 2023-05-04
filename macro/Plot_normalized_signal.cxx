@@ -14,28 +14,43 @@ void Plot_normalized_signal(TString mass = "200")
   Bool_t do_tail_norm = true;
   float tail_value = 2.5;
   
-  std::vector<TString> gen_thresholds =
+  const std::vector<TString> gen_thresholds =
     {
       "100",
       "500",
+      "600",
+      "700",
+      "800",
+      "900",
       "1000"
     };
+
+  std::vector<TH1F*> h_v;
+  std::vector<TH1F*> eff_v;
+
+  for ( int i = 0; i < gen_thresholds.size(); i++ ) {
+    h_v.push_back(new TH1F(Form("h%i",i+1),"",100,0,4));
+    eff_v.push_back(new TH1F(Form("eff%i",i+1),"",100,0,4));
+  }
+  
   TH1F * h0 = new TH1F("h0","",100,0,4);
+  /*
   TH1F * h1 = new TH1F("h1","",100,0,4);
   TH1F * h2 = new TH1F("h2","",100,0,4);
   TH1F * h3 = new TH1F("h3","",100,0,4);
-
+  */
   const char *blips[4] = {"0","1", "2", "3+"};
+  /*
   TH1F * eff1 = new TH1F("eff1","",4,-0.5,3.5);
   TH1F * eff2 = new TH1F("eff2","",4,-0.5,3.5);
   TH1F * eff3 = new TH1F("eff3","",4,-0.5,3.5);
-
-  std::vector<TH1F*> h_v { h1, h2, h3 };
-  std::vector<TH1F*> eff_v { eff1, eff2, eff3 };
+  */ 
+  //std::vector<TH1F*> h_v { h1, h2, h3 };
+  //std::vector<TH1F*> eff_v { eff1, eff2, eff3 };
   std::vector<float> scale_v;
 
   // insert empty data to get bin names in correct order
-  for ( int i = 0; i < 3; i++ ) {
+  for ( int i = 0; i < gen_thresholds.size(); i++ ) {
     eff_v[i]->Fill(blips[0],0);
     eff_v[i]->Fill(blips[1],0);
     eff_v[i]->Fill(blips[2],0);
@@ -44,9 +59,9 @@ void Plot_normalized_signal(TString mass = "200")
   }
   
 
-  h1->SetLineColor(2);
-  h2->SetLineColor(3);
-  h3->SetLineColor(4);
+  for ( int i = 0; i < h_v.size(); i++ ) {
+    h_v[i]->SetLineColor(2+i);
+  }
   auto c1 = new TCanvas();
   c1->SetLogy();
   h0->SetMaximum(0.03);
@@ -65,7 +80,8 @@ void Plot_normalized_signal(TString mass = "200")
 
     TFile *f;
     if ( gth == "1000" ) {
-      f = new TFile(Form("root/def-th_%skev_2hits/spacepoints_1000kev_2hits_%smev.root",gth.Data(),mass.Data()));
+      //f = new TFile(Form("root/def-th_%skev_2hits/spacepoints_1000kev_2hits_%smev.root",gth.Data(),mass.Data()));
+      f = new TFile(Form("root/def-th_%skev_2hits/spacepoints_%smev.root",gth.Data(),mass.Data()));
     } else {
       f = new TFile(Form("root/def-th_%skev_2hits/spacepoints_%smev.root",gth.Data(),mass.Data()));
     }
@@ -194,43 +210,36 @@ void Plot_normalized_signal(TString mass = "200")
   }
   int starting_bin = -1;
   for ( int i = 0; i < h_v[0]->GetNbinsX()+1; i++ ) {
-    std::cout << "hey " << h_v[0]->GetBinLowEdge(i) << std::endl;
+    //std::cout << "hey " << h_v[0]->GetBinLowEdge(i) << std::endl;
     if ( h_v[0]->GetBinLowEdge(i) > tail_value ) {
       starting_bin = i;
       break;
     }
   }
-  std::cout << "starting bin: " << starting_bin << std::endl;
+
   float tail_2 = h_v[2]->Integral(starting_bin,h_v[2]->GetNbinsX()+1);
-  float tail_1 = h_v[1]->Integral(starting_bin,h_v[1]->GetNbinsX()+1);
-  float tail_0 = h_v[0]->Integral(starting_bin,h_v[0]->GetNbinsX()+1);
-  std::cout << Form("h_v[2] after %.1f: ",tail_value) << tail_2 << std::endl;
-  std::cout << Form("h_v[1] after %.1f: ",tail_value) << tail_1 << std::endl;
-  std::cout << Form("h_v[0] after %.1f: ",tail_value) << tail_0 << std::endl;
-
-  std::vector<float> scaling_v { tail_2/tail_0, tail_2/tail_1, tail_2/tail_2};
-
   if ( do_tail_norm ) {
-    for ( int i = 0; i < 3; i++ ) {
-      h_v[i]->Scale(scaling_v[i]);
+    for ( int i = 0; i < h_v.size(); i++ ) {
+      float tail_i = h_v[i]->Integral(starting_bin,h_v[i]->GetNbinsX()+1);
+      h_v[i]->Scale(tail_2/tail_i);
       myleg->AddEntry(h_v[i],Form("%s keV signal (%.0f)#times%.2f",
 				  gen_thresholds[i].Data(),
 				  h_v[i]->GetEntries(),
-				  scaling_v[i]
+				  tail_2/tail_i
 				  ));
       
     }
     
-    std::cout << "scale factors 0, 1: " << tail_2/tail_0 << " " << tail_2/tail_1 << std::endl;
-    std::cout << "new tail 0, 1: " << h_v[0]->Integral(starting_bin,h_v[0]->GetNbinsX()+1)
-	      << " " << h_v[1]->Integral(starting_bin,h_v[1]->GetNbinsX()+1) << std::endl;
   }
   
   myleg->Draw();
   if ( do_pot_norm ) c1->SaveAs(Form("img/norm-pot_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
   if ( do_eff_norm ) c1->SaveAs(Form("img/norm-eff_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
   if ( do_tail_norm ) c1->SaveAs(Form("img/norm-tail_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
-  
+  if ( !do_pot_norm
+       && !do_eff_norm
+       && !do_tail_norm )
+    c1->SaveAs(Form("img/unnorm_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
 
   gStyle->SetPadTopMargin(0.01);
   gStyle->SetPadBottomMargin(0.12);
@@ -240,13 +249,16 @@ void Plot_normalized_signal(TString mass = "200")
   eff_v[0]->GetXaxis()->SetTitleOffset(1.8);
   //eff_v[0]->GetXaxis()->CenterTitle(true);
   //eff_v[0]->GetYaxis()->CenterTitle(true);
-  TLegend *leg = new TLegend(0.4,0.85,0.9,1.0);
+  TLegend *leg = new TLegend(0.4,0.75,0.9,1.0);
   auto *c2 = new TCanvas();
+  
   //c2->SetLogy();
-  for ( int i = 0; i < 3; i++ ) {
-    std::cout << eff_v[i]->GetEntries() << std::endl;
+  //eff_v[0]->SetMaximum(30000);
+  for ( int i = 0; i < gen_thresholds.size(); i++ ) {
+
+    //std::cout << eff_v[i]->GetEntries() << std::endl;
     for ( int b = 1; b <= eff_v[i]->GetNbinsX(); b++ ) {
-      std::cout << eff_v[i]->GetBinContent(b) << std::endl;
+      //std::cout << eff_v[i]->GetBinContent(b) << std::endl;
     }
     std::cout << "----------" << std::endl;
     eff_v[i]->SetMarkerStyle(20+i);
@@ -255,8 +267,14 @@ void Plot_normalized_signal(TString mass = "200")
     eff_v[i]->SetLineColor(2+i);
     eff_v[i]->SetLineWidth(2);
     eff_v[i]->Draw("same PH");
-    leg->AddEntry(eff_v[i],Form("Gen. threshold %skeV (%.0f events)",
-				gen_thresholds[i].Data(),eff_v[i]->GetEntries()));
+    if ( gen_thresholds[i] == "1000" ) {
+      eff_v[i]->Scale(0.25);
+       leg->AddEntry(eff_v[i],Form("Gen. threshold %skeV (%.0f events)x0.25",
+				   gen_thresholds[i].Data(),eff_v[i]->GetEntries()));
+    } else {
+      leg->AddEntry(eff_v[i],Form("Gen. threshold %skeV (%.0f events)",
+				  gen_thresholds[i].Data(),eff_v[i]->GetEntries()));
+    }
   }
   leg->Draw();
   c2->SaveAs("img/eff_combined.pdf");

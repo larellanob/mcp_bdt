@@ -66,30 +66,30 @@ void Draw_detvar_histos(std::vector<TH1F> ratios,TString label,TString dir)
   base_hist->Reset();
   base_hist->Draw();
   base_hist->SetTitle(Form("Detector variations (%s);BDT Score;(CV-detvar)/CV",label.Data()));
-  base_hist->SetMinimum(-1);
-  base_hist->SetMaximum(1);
+  base_hist->SetMinimum(-0.5);
+  base_hist->SetMaximum(0.5);
   // horiz line 25%
   TLine *line25p = new TLine(-10,0.25,10,0.25);
   TLine *line25m = new TLine(-10,-0.25,10,-0.25);
   line25p->SetLineStyle(7);
-  line25p->SetLineColor(kGreen+1);
+  line25p->SetLineColor(kOrange+1);
   line25p->SetLineWidth(2);
   line25p->Draw();
   line25m->SetLineStyle(7);
-  line25m->SetLineColor(kGreen+1);
+  line25m->SetLineColor(kOrange+1);
   line25m->SetLineWidth(2);
   line25m->Draw();
-  // horiz line 50%
-  TLine *line50p = new TLine(-10,0.50,10,0.50);
-  TLine *line50m = new TLine(-10,-0.50,10,-0.50);
-  line50p->SetLineStyle(7);
-  line50p->SetLineColor(kOrange+1);
-  line50p->SetLineWidth(2);
-  line50p->Draw();
-  line50m->SetLineStyle(7);
-  line50m->SetLineColor(kOrange+1);
-  line50m->SetLineWidth(2);
-  line50m->Draw();
+  // horiz line 10%
+  TLine *line10p = new TLine(-10,0.10,10,0.10);
+  TLine *line10m = new TLine(-10,-0.10,10,-0.10);
+  line10p->SetLineStyle(7);
+  line10p->SetLineColor(kGreen+1);
+  line10p->SetLineWidth(2);
+  line10p->Draw();
+  line10m->SetLineStyle(7);
+  line10m->SetLineColor(kGreen+1);
+  line10m->SetLineWidth(2);
+  line10m->Draw();
   
 
   // quadrature
@@ -112,11 +112,11 @@ void Draw_detvar_histos(std::vector<TH1F> ratios,TString label,TString dir)
 
   TLegend leg(0.7,0.1,0.9,0.7);
   leg.AddEntry(line25p,"25%","L");
-  leg.AddEntry(line50p,"50%","L");
+  leg.AddEntry(line10p,"10%","L");
   for ( int i = 0; i < ratios.size(); i++ ) {
     ratios[i].SetLineColor(1+i);
     if ( i+1 == 10 ) ratios[i].SetLineColor(46);
-    ratios[i].Draw("HE0 same");
+    ratios[i].Draw("H same");
     TH1F * h_rat = (TH1F*)ratios[i].Clone(); // rat is for ratio
     h_rat->Write();
     leg.AddEntry(&ratios[i],samples[i]);

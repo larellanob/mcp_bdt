@@ -9,7 +9,7 @@ import os
 import numpy as np
 import numpy.ma as ma # masked numpy arrays, to remove invalid data
 from sklearn.preprocessing import StandardScaler
-
+import json
 
 debug = False
 necessary_dirs = ["models","root","img"]
@@ -24,7 +24,7 @@ gen_th = "1000"
 nhits  = "2"
 
 tag   = "%s_%skev_%shits"%(fcl_th,gen_th,nhits)
-model = "%s_230301"%(tag)
+model = "%s_230424"%(tag)
 input_root_file = 'root/%s/preselection_%skev_%shits_combinedmass.root'%(tag,gen_th,nhits)
 #################################################################################
 #################################################################################
@@ -35,6 +35,7 @@ try:
     uproot_file = uproot.open(input_root_file)#["tsig_train"]
 except OSError:
     print("Can't find input root file. Terminating")
+    print(input_root_file)
     exit()
 
 
@@ -233,25 +234,49 @@ if debug:
 
 parameters = [
     ('booster', 'dart'),
+    ('rate_drop', 0.1),
+    ('skip_drop', 0.5),
     ('max_depth', 6),
     ('eta', 0.3),
     ('objective', 'binary:logistic'),
     ('subsample', 0.5),
-    ('tree_method', 'hist'),
+#    ('tree_method', 'hist'),
+    ('tree_method', 'auto'),
     ('scale_pos_weight', None),
-    ('rate_drop', 0.1),
     ('eval_metric','logloss'), # i added this
-    ('eval_metric','error'), # i added this
-    ('skip_drop', 0.5)
+#    ('eval_metric','auc'), # i added this
+#    ('eval_metric','map'), # i added this
+    ('eval_metric','error') # i added this
 ]
 
 num_rounds = 30
+#num_rounds = 1
 
 evals_result={}
 print("Training begin")
 bdt = xgb.train(parameters,xgb_train,num_rounds,evals=watchlist,evals_result=evals_result)
+#bdt = xgb.train(parameters,xgb_train,num_rounds)
 print("Training complete")
+print(bdt.best_ntree_limit)
+#exit()
 
+print(json.dumps(evals_result,indent=2))
+for i in evals_result:
+    print(i)
+    print(evals_result[i]["logloss"])
+
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+
+    logloss1 = ax1.plot(evals_result[i]["logloss"],'b-')
+    error1 = ax2.plot(evals_result[i]["error"],'r-')
+    plt.title(i)
+    ax1.set_xlabel("iteration")
+    ax1.set_ylabel("logloss",color='b')
+    ax2.set_ylabel("error",color='r')
+    #plt.show()
+
+#exit()
 # pawel saves multiple runs, look into that
 bdt.save_model("models/%s_model.json"%(model))
 bdt.dump_model("models/%s_dump.txt"%(model))
@@ -309,7 +334,7 @@ with uproot.recreate(output_root_file) as f:
     for sample in samples:
         # sample[0] is the DMatrix
         # sample[1] is the string
-        prediction = bdt.predict(sample[0], output_margin=True)
+        prediction = bdt.predict(sample[0], iteration_range=(0,num_rounds),output_margin=True)
         
         # branches which will go in the file are input from dictionary
         # they get added backwards for some reason
@@ -327,7 +352,8 @@ for m in masses:
     print("MASS:",m)
 
     #output_test_root_file = "root/%s/%s_BDT_scores_mass%s.root"%(tag,model,m)
-    test_file = 'root/%s/preselection_%skev_%shits_%smev.root'%(tag,gen_th,nhits,m)
+    #test_file = 'root/%s/preselection_%skev_%shits_%smev.root'%(tag,gen_th,nhits,m)
+    test_file = 'root/%s/preselection_%smev.root'%(tag,m)
     print("opened file",test_file)
     test_uproot = uproot.open(test_file)
 
@@ -361,7 +387,7 @@ for m in masses:
     samples[1] += (test_uproot['tbg_test'].arrays(["run","evt"],library="np"),)
 
 
-    out_test_file = 'root/%s/test_BDT_scores_%skev_%shits_%smev.root'%(tag,gen_th,nhits,m)
+    out_test_file = 'root/%s/test_BDT_scores_%smev.root'%(tag,m)
     out_test_files.append(out_test_file)
     print("saving file",out_test_file)
     with uproot.recreate(out_test_file) as f2:
@@ -380,6 +406,7 @@ for m in masses:
             branches['bdt'] = prediction
             
             f2[sample[1]] = branches
+        f2['total_pot'] = test_uproot['total_pot'].arrays(["tot_pot","tot_evt"],library="np")
 
             
 print(out_test_files)
@@ -389,3 +416,9 @@ for tf in out_test_files:
     os.system(root_cmd)
 
 
+# make overtraining check figures
+model_number = model.split('_')[-1]
+root_cmd = 'root -l -b -q macro/overtraining_check.cxx\'("%s","%s")\''%(tag,model_number)
+print("running")
+print(root_cmd)
+os.system(root_cmd)
