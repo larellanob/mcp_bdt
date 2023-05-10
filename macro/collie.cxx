@@ -45,9 +45,21 @@ void collie()
 				    analysis.Data(),mass);
     TFile *f_sys_sig = new TFile(sys_sig_filename);
     TFile *f_sys_bkg = new TFile(sys_bkg_filename);
-    // plot bdt + errors
+    // get bdt histograms for sig and bkg
     TH1F *bdt_sig = (TH1F*)f_bdt->Get("sig_hist");
     TH1F *bdt_bkg = (TH1F*)f_bdt->Get("bkg_hist");
+    // bdt pot/event scaling
+    TTree *pot_t = (TTree*)f_bdt->Get("total_pot");
+    double pot, evt;
+    pot_t->SetBranchAddress("tot_pot",&pot);
+    pot_t->SetBranchAddress("tot_evt",&evt);
+    pot_t->GetEntry(0);
+    std::cout << "POT, events: " << pot << " " << evt << std::endl;
+    float pot_runs123 = 1.5e21;
+    float eve_runs123 = 3081362.;
+    bdt_sig->Scale(pot_runs123/pot);
+    bdt_bkg->Scale(eve_runs123/evt);
+    
     TH1F *sys_sig = (TH1F*)f_sys_sig->Get("quadrature");
     TH1F *sys_bkg = (TH1F*)f_sys_bkg->Get("quadrature");
     TH1F *bdt_sig_full = (TH1F*)bdt_sig->Clone();

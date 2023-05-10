@@ -8,10 +8,12 @@ void Plot_normalized_signal(TString mass = "200")
   // to number of missing reco blips
   Bool_t do_eff_norm = false;
   // pot normalization: normalize according to signal POT
-  Bool_t do_pot_norm = false;
+  Bool_t do_pot_norm = true;
   // tail normalization: normalize according to integral of the tail
   // of the histogram, where low-threshold stuff shouldn't matter
-  Bool_t do_tail_norm = true;
+  Bool_t do_tail_norm = false;
+  // low blip only: only use the lowest adc blip in the event for filling the histo
+  Bool_t do_low_blip_only = false;
   float tail_value = 2.5;
   
   const std::vector<TString> gen_thresholds =
@@ -68,6 +70,7 @@ void Plot_normalized_signal(TString mass = "200")
   if ( mass == "400" ) h0->SetMaximum(0.003);
   if ( !do_pot_norm ) h0->SetMaximum(5000);
   TString basetitle = Form("True blips #leq 2 - %s MeV",mass.Data());
+  if ( do_low_blip_only ) basetitle = Form("Lowest-energy blip for 2-true-blip events - %s MeV",mass.Data());
   TString fulltitle = Form("%s;log_{10}(true integrals);Reco blips",basetitle.Data());
   h0->SetTitle(fulltitle);
   h0->Draw();
@@ -142,7 +145,14 @@ void Plot_normalized_signal(TString mass = "200")
       for ( int i = 0; i < adc.size(); i++ ) {
 	// ignore high blip events
 	if ( adc.size() > 2 ) continue;
-	h_v[counter_signal]->Fill(adc[i]);
+	if ( do_low_blip_only ) {
+	  if ( adc.size() != 2 ) continue;
+	  std::vector<float>::iterator min_adc = std::min_element(adc.begin(),adc.end());
+	  //std::cout << *min_adc << std::endl;
+	  h_v[counter_signal]->Fill(*min_adc);
+	} else {
+	  h_v[counter_signal]->Fill(adc[i]);
+	}
       }
 
       // efficiency (bin migration histogram)
@@ -197,6 +207,13 @@ void Plot_normalized_signal(TString mass = "200")
       
 
     }
+    if ( do_pot_norm ) {
+      myleg->AddEntry(h_v[counter_signal],Form("%s keV signal (%.0f)",
+					       gen_thresholds[counter_signal].Data(),
+					       h_v[counter_signal]->GetEntries()
+					       )
+		      );
+    }
   } // end looping over files/gen-thresholds
 
 
@@ -233,7 +250,12 @@ void Plot_normalized_signal(TString mass = "200")
   }
   
   myleg->Draw();
-  if ( do_pot_norm ) c1->SaveAs(Form("img/norm-pot_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
+  if ( do_pot_norm && !do_low_blip_only ) {
+    c1->SaveAs(Form("img/norm-pot_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
+  }
+  if ( do_pot_norm && do_low_blip_only ) {
+    c1->SaveAs(Form("img/norm-pot_low-e-blip_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
+  }
   if ( do_eff_norm ) c1->SaveAs(Form("img/norm-eff_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
   if ( do_tail_norm ) c1->SaveAs(Form("img/norm-tail_signal_comparison_ttreereader_%smev.pdf",mass.Data()));
   if ( !do_pot_norm
