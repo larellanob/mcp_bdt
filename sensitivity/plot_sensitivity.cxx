@@ -41,7 +41,9 @@ void plot_sensitivity()
 {
   // base canvas
   TCanvas *c1 = new TCanvas();
-  TH2 * h2 = new TH2F("h2",";Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,10000,10,0.5e-4,2.5e-1);
+  //TH2 * h2 = new TH2F("h2",";Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,10000,10,0.5e-4,2.5e-1);
+  // zoomed in to make it look more like sensei limits figure
+  TH2 * h2 = new TH2F("h2",";Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,4000,10,9.5e-5,0.045);
   h2->GetXaxis()->CenterTitle();
   h2->GetYaxis()->CenterTitle();
   c1->SetLogx();
@@ -56,6 +58,9 @@ void plot_sensitivity()
   limit_curve lhcc("LHC",kGray);
   limit_curve slac("SLAC",kRed);
   limit_curve sens("SENSEI",kOrange);
+  limit_curve supk("Super K PB+MD",kMagenta);
+  limit_curve bebc("BEBC",kAzure-5);
+  limit_curve chrm("CHARM II",kOrange+3);
 
   mini.Draw("same");
   mill.Draw("same");
@@ -64,6 +69,10 @@ void plot_sensitivity()
   slac.Draw("same");
   argo.Draw("same");
   sens.Draw("same");
+  supk.Draw("same");
+  bebc.Draw("same");
+  chrm.Draw("same");
+  
 
   // own limits (microboone)
   limit_curve syst("def-th_no-syst",kGreen+1,false);
@@ -85,6 +94,9 @@ void plot_sensitivity()
   myleg->AddEntry(lhcc.get_tgraph());
   myleg->AddEntry(slac.get_tgraph());
   myleg->AddEntry(sens.get_tgraph());
+  myleg->AddEntry(supk.get_tgraph());
+  myleg->AddEntry(bebc.get_tgraph());
+  myleg->AddEntry(chrm.get_tgraph());
   myleg->AddEntry(syst.get_tgraph());
   myleg->AddEntry(no_syst.get_tgraph());
   myleg->Draw("same");
