@@ -20,11 +20,14 @@ for d in necessary_dirs:
 
 
 fcl_th = "def-th"
-gen_th = "1000"
-nhits  = "2"
+gen_th = "5000"
+nhits  = "1"
 
-tag   = "%s_%skev_%shits"%(fcl_th,gen_th,nhits)
-model = "%s_230424"%(tag)
+#tag   = "%s_%skev_%shits"%(fcl_th,gen_th,nhits)
+#tag = "MillichargeGamma3D_run1-2a-2b-3a"
+tag = 'MillichargeBlip_%skev'%(gen_th)
+# model = "%s_230424"%(tag)
+model = "%s_231106"%(tag)
 input_root_file = 'root/%s/preselection_%skev_%shits_combinedmass.root'%(tag,gen_th,nhits)
 #################################################################################
 #################################################################################
@@ -57,10 +60,10 @@ if debug:
 
 tree = uproot_file['tsig_train']
 branches = tree.arrays()
-print("branches",branches)
 
 
 if debug:
+    print("branches",branches)
     print(branches['px1'])
     print("\nThis is the official way to look into events\n")
     print(branches['px1'][0:5])
@@ -78,9 +81,8 @@ featmap_vars = {
                  'dca_nhM_ahead'],
 #            'sum_nhits_1','sum_nhits_2','sum_nhits'],
         'q':[ 'px1', 'py1', 'pz1', 'log10_adc1', 'px2', 'py2', 'pz2', 'log10_adc2',
-            'dist', 'theta', 'phi', 'sqrt_dca_behind', 'sqrt_dca_mid',
-            'sqrt_dca_ahead', 'dca_log10_adc_behind', 'dca_log10_adc_mid', 'dca_log10_adc_ahead',
-            'sqrt_mindist_closest', 'mindist_log10_adc_closest' ],
+            'dist', 'theta', 'phi', 'sqrt_dca_behind',
+            'sqrt_dca_ahead' ],
         'i':[],
         }
 
@@ -96,19 +98,20 @@ for i in tree.keys():
         if i in featmap_vars[j]:
             line = str(featmap_counter)+"\t"+str(i)+"\t"+str(j)+"\n"
             featmap_file.write(line)
-            print("--------")
-            print(i,j)
-            print(line)
-            print("--------")
+            if debug:
+                print("--------")
+                print(i,j)
+                print(line)
+                print("--------")
             featmap_list.append(i)
             featmap_counter+=1
 featmap_file.close()
 # do not close! we will keep using this
 # yes close, then we open again
-print(featmap_list)
-print(len(featmap_list))
 
 if debug:
+    print(featmap_list)
+    print(len(featmap_list))
     print("####################################################################")
     print("                               train                                ")
     print("####################################################################")
@@ -165,28 +168,34 @@ if debug:
     print("\nAll good so far\n")
 
 
-truth_label = np.concatenate((np.zeros(len(train_bkg_data[0])),np.ones(len(train_sig_data[0]))))
-print(truth_label)
-print(truth_label.size)
-print(type(truth_label))
+#truth_label = np.concatenate((np.zeros(len(train_bkg_data[0])),np.ones(len(train_sig_data[0]))))
+truth_label = np.concatenate((np.ones(len(train_sig_data[0])),np.zeros(len(train_bkg_data[0]))))
+if debug:
+    print(truth_label)
+    print(truth_label.size)
+    print(type(truth_label))
 truth_label=truth_label.ravel()
-print("flattened")
-print(truth_label)
-print(truth_label.size)
-print(type(truth_label))
+if debug:
+    print("flattened")
+    print(truth_label)
+    print(truth_label.size)
+    print(type(truth_label))
 train_data = np.transpose(train_data)
-print("train_data dim, shape")
-print(train_data.ndim,train_data.shape)
+if debug:
+    print("train_data dim, shape")
+    print(train_data.ndim,train_data.shape)
 
-print("\nsig_data\n")
-print(train_sig_data.size)
-print(train_sig_data.ndim,train_sig_data.shape)
-l = [1]*len(train_sig_data[0])
+    print("\nsig_data\n")
+    print(train_sig_data.size)
+    print(train_sig_data.ndim,train_sig_data.shape)
+l =[1]*len(train_sig_data[0])
 l2=[0]*len(train_bkg_data[0])
 l3=[1]*len(test_sig_data[0])
 l4=[0]*len(test_bkg_data[0])
 
+print("Len of l (signal train) and first five elements::")
 print(len(l))
+print(l[:5])
 
 train_sig_data = np.transpose(train_sig_data)
 train_bkg_data = np.transpose(train_bkg_data)
@@ -246,24 +255,27 @@ parameters = [
     ('eval_metric','logloss'), # i added this
 #    ('eval_metric','auc'), # i added this
 #    ('eval_metric','map'), # i added this
-    ('eval_metric','error') # i added this
+    ('eval_metric','error'), # i added this
+    ('learning_rate',0.1)
 ]
 
-num_rounds = 30
+# put a high number here and "early_stopping_rounds" will cut the
+# training short if there's no improvement in X rounds
+num_rounds = 300
 #num_rounds = 1
 
 evals_result={}
 print("Training begin")
-bdt = xgb.train(parameters,xgb_train,num_rounds,evals=watchlist,evals_result=evals_result)
+bdt = xgb.train(parameters,xgb_train,num_rounds,evals=watchlist,evals_result=evals_result,early_stopping_rounds=20)
 #bdt = xgb.train(parameters,xgb_train,num_rounds)
 print("Training complete")
-print(bdt.best_ntree_limit)
+print(bdt.best_iteration)
 #exit()
 
 print(json.dumps(evals_result,indent=2))
 for i in evals_result:
-    print(i)
-    print(evals_result[i]["logloss"])
+    #print(i)
+    #print(evals_result[i]["logloss"])
 
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
@@ -274,7 +286,8 @@ for i in evals_result:
     ax1.set_xlabel("iteration")
     ax1.set_ylabel("logloss",color='b')
     ax2.set_ylabel("error",color='r')
-    #plt.show()
+    plt.show()
+
 
 #exit()
 # pawel saves multiple runs, look into that
@@ -325,16 +338,23 @@ print("Exporting file "+output_root_file)
 
 
 samples = watchlist
+print("wlist")
 samples[0] += (uproot_file['tsig_train'].arrays(["run","evt"],library="pd"),)
+print("passed 0")
 samples[1] += (uproot_file['tbg_train'].arrays(["run","evt"],library="pd"),)
+print("passed 1")
 samples[2] += (uproot_file['tsig_test'].arrays(["run","evt"],library="pd"),)
+print("passed 2")
 samples[3] += (uproot_file['tbg_test'].arrays(["run","evt"],library="pd"),)
-
+print("defined samples")
 with uproot.recreate(output_root_file) as f:
+    print("with file as f")
     for sample in samples:
+        print("sample")
         # sample[0] is the DMatrix
         # sample[1] is the string
-        prediction = bdt.predict(sample[0], iteration_range=(0,num_rounds),output_margin=True)
+        #prediction = bdt.predict(sample[0], iteration_range=(0,num_rounds),output_margin=True)
+        prediction = bdt.predict(sample[0],output_margin=True)
         
         # branches which will go in the file are input from dictionary
         # they get added backwards for some reason
@@ -344,10 +364,9 @@ with uproot.recreate(output_root_file) as f:
         branches['bdt'] = prediction
 
         f[sample[1]] = branches
-
-masses = [100,150,200,300,350,400]
+print("masses")
+masses = [15,20,30,50,80,100,150,200,250,300,350,400]
 out_test_files = []
-
 for m in masses:
     print("MASS:",m)
 

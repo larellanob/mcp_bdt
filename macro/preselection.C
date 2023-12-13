@@ -1,4 +1,10 @@
-void preselection(const char* fn = "spacepoints_mc.root") {
+#include "Plot_adc_preselection.cxx"
+
+//void preselection(const char* fn = "spacepoints_mc.root") {
+void preselection(TString fn = "spacepoints_mc.root") {
+  std::pair<double,double> cuts = Plot_adc_preselection(fn);
+  std::cout << "From Plot_adc_preselection obtained following cuts: " <<
+    cuts.first << " " << cuts.second << std::endl;
   TFile *f = new TFile(fn);
   TTree *t = (TTree*)f->Get("ana/t");
   if ( t == nullptr ) {
@@ -6,6 +12,10 @@ void preselection(const char* fn = "spacepoints_mc.root") {
 	      << "No POT information will be saved" << std::endl;
     t  = (TTree*)f->Get("t");
   }
+  std::cout << std::endl;
+  std::cout << "----------------------" << std::endl;
+  std::cout << "Running preselection.C" << std::endl;
+  std::cout << "----------------------" << std::endl;
   int run,  evt;
   t->SetBranchAddress("run",&run);
   t->SetBranchAddress("evt",&evt);
@@ -25,11 +35,12 @@ void preselection(const char* fn = "spacepoints_mc.root") {
   t->SetBranchAddress("elec_E",&true_enes);
   t->SetBranchAddress("pl2_true_integs",&true_adcs);
 
-  TString output_filename {Form("%s_output.root",fn)};
+  TString output_filename {Form("%s_output.root",fn.Data())};
   TString infile_compare = fn;
   if ( infile_compare != "spacepoints.root" ) {
     output_filename = infile_compare;
     output_filename.ReplaceAll("spacepoints","preselection");
+    output_filename.ReplaceAll("ntuple","preselection");
   }
   std::cout << output_filename << std::endl;
   float train_fraction = 0.7;
@@ -207,7 +218,7 @@ void preselection(const char* fn = "spacepoints_mc.root") {
     ot_truephi = true_zs->size() == 2 ? (tz1 < tz2 ? (tp2-tp1).Unit().Phi() : (tp1-tp2).Unit().Phi()) : 0.;
     for(size_t isps = 0; isps < pxs->size(); ++isps) {
       const double adc1 = adcs->at(isps);
-      if(adc1 < 100 || adc1 > 3630) continue;
+      if(adc1 < pow(10,cuts.first) || adc1 > pow(10,cuts.second)) continue;
       const double px1 = pxs->at(isps);
       const double py1 = pys->at(isps);
       const double pz1 = pzs->at(isps);
@@ -238,7 +249,7 @@ void preselection(const char* fn = "spacepoints_mc.root") {
 
       for(size_t jsps = isps+1; jsps < pxs->size(); ++jsps) {
         const double adc2 = adcs->at(jsps);
-        if(adc2 < 100 || adc2 > 3630) continue;
+        if(adc2 < pow(10,cuts.first) || adc2 > pow(10,cuts.second)) continue;
         const bool train_bg = rand.Uniform() < train_fraction; //is_train(istrain_map_bg,run,evt,0.002);
         const bool train_sig = rand.Uniform() < train_fraction; //is_train(istrain_map_sig,run,evt,0.7);
         const double px2 = pxs->at(jsps);
@@ -279,7 +290,8 @@ void preselection(const char* fn = "spacepoints_mc.root") {
         const double thetadeg = ot_dirtheta * TMath::RadToDeg();
         const double phideg = ot_dirphi * TMath::RadToDeg();
 
-        if(thetadeg < 26 || thetadeg > 30 || phideg < 0 || phideg > 10) continue;
+        //if(thetadeg < 26 || thetadeg > 30 || phideg < 0 || phideg > 10) continue;
+	if(thetadeg < 27 || thetadeg > 29 || phideg < 3 || phideg > 9) continue;
 
 
         ot_dist_closest_behind = 1e100, ot_dist_closest_mid = 1e100, ot_dist_closest_ahead = 1e100;

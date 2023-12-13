@@ -14,7 +14,7 @@ import pathlib
 data_pot = 1.5e21
 data_eve = 3081362.
 
-use_systematics = True
+use_systematics = False
 use_sig_syst = False
 if not use_systematics:
     use_sig_syst = False
@@ -46,67 +46,6 @@ def get_CL_range(observations, model,unbounded_bounds,cl):
     up_range = obs_limit+obs_limit/2.
     return np.linspace(lo_range,up_range,50)
     
-
-# normal thresholds
-def get_scaling(mass):
-    # returns sig scaling, bkg scaling
-    eve = 0
-    pot = 0
-    pot_runs123 = 1.5e21
-    eve_runs123 = 3081362.
-    if mass == 100:
-        eve = 11617
-        pot = 1.48e27
-    elif mass == 150:
-        eve = 14335
-        pot = 2.44e27
-    elif mass == 200:
-        eve = 11310
-        pot = 2.56e27
-    elif mass == 300:
-        eve = 9902
-        pot = 4.76e27
-    elif mass == 350:
-        eve = 9950
-        pot = 9.76e27
-    elif mass == 400:
-        eve = 9953
-        pot = 2.28e29
-    else:
-        return 0
-    return pot_runs123/float(pot),eve_runs123/float(eve)
-
-'''
-# low thresholds
-
-def get_scaling(mass):
-    # returns sig scaling, bkg scaling
-    eve = 0
-    pot = 0
-    pot_runs123 = 1.5e21
-    eve_runs123 = 3081362.
-    if mass == 100:
-        eve = 12012
-        pot = 1.52e27
-    elif mass == 150:
-        eve = 9550
-        pot = 1.63e27
-    elif mass == 200:
-        eve = 9600
-        pot = 2.16e27
-    elif mass == 300:
-        eve = 9500
-        pot = 4.70e27
-    elif mass == 350:
-        eve = 9553
-        pot = 9.36e27
-    elif mass == 400:
-        eve = 9950
-        pot = 2.15e29
-    else:
-        return 0
-    return pot_runs123/float(pot),eve_runs123/float(eve)
-'''
 
 def detector_systematics(sig_or_bkg, mass,detvars="detvars"):
     # detector variations only make sense compared to CV
@@ -195,6 +134,12 @@ def get_limit(directory, filename, mass):
     bkg_bins = bkg.values().tolist()
     err_bins = bkg.errors().tolist()
 
+    '''
+    sig_bins = sig_bins[:25]
+    bkg_bins = bkg_bins[:25]
+    err_bins = err_bins[:25]
+    '''
+    
     print(sig_bins)
     print(bkg_bins)
     print(err_bins)
@@ -226,40 +171,41 @@ def get_limit(directory, filename, mass):
 
     ## systematics
     #sig_syst, bkg_syst = detector_systematics_sigbkg(mass) # 8 hours for same result
-    sig_syst, bkg_syst = detector_systematics_quadrature(mass)
+    if use_systematics:
+        sig_syst, bkg_syst = detector_systematics_quadrature(mass)
+        
 
+        for dv in sig_syst:
+            # when looping over a dict you're looping over the keys
+            if dv == 'CV':
+                continue
+            data = model.spec['channels'][0]['samples'][0]['data']
+            absolute = []
+            for i in range(0,len(data)):
+                absolute.append(abs(data[i]*sig_syst[dv][i]))
+            new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': absolute}
+            #new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': sig_syst[dv]}
+            if use_sig_syst:
+                model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
+                print("using signal systematics")
 
-    for dv in sig_syst:
-        # when looping over a dict you're looping over the keys
-        if dv == 'CV':
-            continue
-        data = model.spec['channels'][0]['samples'][0]['data']
-        absolute = []
-        for i in range(0,len(data)):
-            absolute.append(abs(data[i]*sig_syst[dv][i]))
-        new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': absolute}
-        #new_entry = {'name':dv+"_sig",'type':'shapesys', 'data': sig_syst[dv]}
-        if use_sig_syst:
-            model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
-            print("HHHHHHHHHHEEEEEEEEEEY, using signal systematics")
+        for dv in bkg_syst:
+            print(dv)
+            # when looping over a dict you're looping over the keys
+            if dv == 'CV':
+                continue
+            data = model.spec['channels'][0]['samples'][1]['data']
+            absolute = []
+            for i in range(0,len(data)):
+                print(data[i],bkg_syst[dv][i],data[i]*bkg_syst[dv][i])
+                if use_flat_50p:
+                    absolute.append(abs(data[i]*0.5))
+                else:
+                    absolute.append(abs(data[i]*bkg_syst[dv][i]))
+                    print("BKG syst[i]:",i,bkg_syt[dv][i])
+            new_entry = {'name':dv+"_bkg",'type':'shapesys', 'data': absolute}
+            model.spec['channels'][0]['samples'][1]['modifiers'].append(new_entry)
 
-    for dv in bkg_syst:
-        print(dv)
-        # when looping over a dict you're looping over the keys
-        if dv == 'CV':
-            continue
-        data = model.spec['channels'][0]['samples'][1]['data']
-        absolute = []
-        for i in range(0,len(data)):
-            print(data[i],bkg_syst[dv][i],data[i]*bkg_syst[dv][i])
-            if use_flat_50p:
-                absolute.append(abs(data[i]*0.5))
-            else:
-                absolute.append(abs(data[i]*bkg_syst[dv][i]))
-                print("BKG syst[i]:",i,bkg_syt[dv][i])
-        new_entry = {'name':dv+"_bkg",'type':'shapesys', 'data': absolute}
-        model.spec['channels'][0]['samples'][1]['modifiers'].append(new_entry)
-    
     print("dumping the entire json model")
     print(json.dumps(model.spec,indent=2))
 
@@ -380,20 +326,19 @@ def get_limit(directory, filename, mass):
         plt.show()
     return obs_limit, exp_limits
 
-masses = [ 100.,150.,200.,300.,350.,400. ]
-#masses = [ 350. ]
+masses = [ 15.,20.,30.,50.,80.,100.,150.,200.,250.,300.,350.,400. ]
 obs_limits = []
 exp_limits = []
 #mass = masses[4]
 
-detvars_dict = detector_systematics("signal",200)
+#detvars_dict = detector_systematics("signal",200)
 print("Printing list")
-for dv in detvars_dict:
-    print(dv,detvars_dict[dv],"\n")
+#for dv in detvars_dict:
+#    print(dv,detvars_dict[dv],"\n")
 #exit()
 
 for m in masses:
-    directory = "root/def-th_1000kev_2hits/"
+    directory = "root/MillichargeGamma3D_run1-2a-2b-3a/"
     filename = "hist_BDT_scores_%imev.root"%m
     o_l, e_l = get_limit(directory,filename,m)
     obs_limits.append(o_l)
@@ -406,7 +351,7 @@ for i in range(0,len(masses)):
 epsilon = 0.001
 nhits   = 2
 
-print("100.0 1.0")
+print("15. 1.0")
 for i in range(0,len(masses)):
     sens = epsilon * pow(obs_limits[i],1./(2.+nhits*2))
     print(masses[i],sens)

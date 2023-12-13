@@ -1,6 +1,8 @@
 void Plot_normalized_signal(TString mass = "200")
 {
   gStyle->SetOptStat(0);
+  gROOT->GetStyle("uboone_sty_colz");
+  uboone_sty_colz->cd();
 
   // normalization type
 
@@ -26,6 +28,8 @@ void Plot_normalized_signal(TString mass = "200")
       "900",
       "1000"
     };
+
+  TGraph eff_g(gen_thresholds.size());
 
   std::vector<TH1F*> h_v;
   std::vector<TH1F*> eff_v;
@@ -129,6 +133,8 @@ void Plot_normalized_signal(TString mass = "200")
     int n_one_blip = 0;
     int n_two_blips  = 0;
     int n_twoplus_blips = 0;
+    int total_true = 0;
+    int total_reco = 0;
     
     while (tr.Next() ) {
       std::vector<float> adc;
@@ -137,6 +143,7 @@ void Plot_normalized_signal(TString mass = "200")
       for ( int i = 0; i < true_integs.GetSize(); i++ ) {
 	if ( true_integs[i] > 0.0 ) {
 	  current_nblips++;
+	  total_true++;
 	  adc.push_back(log10(true_integs[i]));
 	}
       }
@@ -170,6 +177,14 @@ void Plot_normalized_signal(TString mass = "200")
 	eff_v[counter_signal]->Fill(blips[3],1);
       }
     } // end while ttreereader
+
+
+    // efficiency tgraph
+    int si = gth.Atoi();
+    double eff_calc = (double)total_true/((double)tree->GetEntries()*2.0);
+    std::cout << "EFF CALC: " << eff_calc << std::endl;
+    std::cout << "total true, entries x2: " << total_true << " " << pot_tree->GetEntries()*2.0 << std::endl;
+    eff_g.SetPoint(counter_signal,si,eff_calc);
     
     //tree->Draw("log10(pl2_true_integs)>>h","log10(pl2_true_integs)!=0","same");
     //TH1F *h = (TH1F*)gDirectory->Get("h");
@@ -301,5 +316,16 @@ void Plot_normalized_signal(TString mass = "200")
   leg->Draw();
   c2->SaveAs("img/eff_combined.pdf");
   c2->SaveAs("img/eff_combined.png");
+
+  auto *c3 = new TCanvas();
+  eff_g.SetMaximum(1.05);
+  eff_g.SetMinimum(0.0);
+  eff_g.SetMarkerStyle(kFullSquare);
+  eff_g.SetMarkerColor(kRed);
+  eff_g.SetMarkerSize(2.0);
+  eff_g.Draw("AP");
+  eff_g.SetTitle(";Threshold (keV);Efficiency");
+  c3->SaveAs("img/eff_tgraph.pdf");
+  c3->SaveAs("img/eff_tgraph.png");
   
 }

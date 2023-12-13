@@ -1,26 +1,39 @@
-void Plot_Preselection()
+void Plot_Preselection(TString model)
 {
-  TString model = "model_221207_combinedmass_pot";
-  TFile *f = new TFile(Form("root/%s/spacepoints_1000kev_2hits_combinedmass.root",model.Data()));
-  //TH2F * full_angles = new TH2F("full_angles",
-  TTree *tree = (TTree*)f->Get("t");
+  //TString model = "model_221207_combinedmass_pot";
 
-  TH2F * bkg = new TH2F("bkg","Background pair angle distribution;#Delta#theta;#Delta#phi",50,0,90,50,-180,180);
+  if ( model == "" ) {
+    model = "MillichargeBlipTweaks_run1-2a-2b-3a";
+  }
+  TString filename = Form("root/%s/ntuple_800kev_2hits_combinedmass.root",model.Data());
+  TFile *f = new TFile(filename);
+  //TH2F * full_angles = new TH2F("full_angles",
+  TTree *tree = (TTree*)f->Get("ana/t");
+
+  TH2F * bkg = new TH2F("bkg",
+			"Background pair angle distribution - "+model+";#Delta#theta;#Delta#phi",
+			50,0,90,50,-180,180);
   //  bkg->SetLineColor(kRed);
 
-  TH2F * sig = new TH2F("sig","Signal pair angle distribution;theta;phi",50,0,90,50,-180,180);
-  TH2F * bkg_and_sig = new TH2F("bkg_and_sig","Pair angle distribution bkg+sig;#Delta#theta;#Delta#phi",50,0,90,50,-180,180);
+  TH2F * sig = new TH2F("sig",
+			"Signal blip pair angle distribution - "+model+";theta;phi",
+			50,0,90,50,-180,180);
+  TH2F * bkg_and_sig = new TH2F("bkg_and_sig",
+				"Blip pair angle distribution bkg+sig - "+model+";#Delta#theta;#Delta#phi",
+				50,0,90,50,-180,180);
 
-  TH2F * bkg_and_sig_zoom = new TH2F("bkg_and_sig_zoom","Pair angle distribution bkg+sig;#Delta#theta;#Delta#phi",50,20,35,50,-10,20);
+  TH2F * bkg_and_sig_zoom = new TH2F("bkg_and_sig_zoom",
+				     "Blip pair angle distribution bkg+sig - "+model+";#Delta#theta;#Delta#phi",
+				     50,20,35,50,-10,20);
 
   TH1F * dist = new TH1F("dist","dist to true hits;distance",500,0,1200);
 
   bool preselection = true;
-  TH1F * nsps = new TH1F("nsps","Before preselection;Number of spacepoints;Events",50,0,200);
-  TH1F * nsps_pairs = new TH1F("nsps_pairs","Before preselection;Number of spacepoint pairs;Events",200,0,8000);
+  TH1F * nsps = new TH1F("nsps","Before preselection - "+model+";Number of blips;Events",50,0,200);
+  TH1F * nsps_pairs = new TH1F("nsps_pairs","Before preselection - "+model+";Number of blip pairs;Events",200,0,8000);
   if ( preselection ) {
-    nsps->SetTitle("After preselection");
-    nsps_pairs->SetTitle("After preselection");
+    nsps->SetTitle("After preselection - "+model);
+    nsps_pairs->SetTitle("After preselection - "+model);
   }
 
   vector<double> *pxs = 0, *pys = 0, *pzs = 0, *adcs = 0;
@@ -66,7 +79,7 @@ void Plot_Preselection()
     //bkg->Fill(
     sig->Fill(ot_truetheta*TMath::RadToDeg(),ot_truephi*TMath::RadToDeg());
 
-    // loop over all reconstructed spacepoints
+    // loop over all reconstructed blips
     int nsps_counter {0};
     int nsps_pairs_counter {0};
     for(size_t isps = 0; isps < pxs->size(); ++isps) {

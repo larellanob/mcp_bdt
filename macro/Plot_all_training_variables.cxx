@@ -1,4 +1,17 @@
-void Plot_training_variables(TString tag = "def-th_1000kev_2hits", int mass = 100)
+//////////////////////////
+//////////////////////////
+//////////////////////////
+// README:
+//////////////////////////
+//////////////////////////
+//////////////////////////
+// main macro is at the bottom
+// it calls this one for all masses
+// change the tag in the one below
+// Plot_training_ALL_masses
+
+
+void Plot_training_variables(TString tag = "MillichargeBlip_run1-2a-2b-3a", int mass = 100)
 {
   TString sps_or_pre = "preselection";
   TString filename = Form("root/%s/%s_%imev.root",tag.Data(),sps_or_pre.Data(),mass);
@@ -102,9 +115,9 @@ void Plot_training_variables(TString tag = "def-th_1000kev_2hits", int mass = 10
 
 }
 
-void Plot_all_training_variables(TString tag = "def-th_1000kev_2hits")
+void Plot_all_training_variables(TString tag = "MillichargeBlip_run1-2a-2b-3a")
 {
-  std::vector<int> masses {100,150,200,300,350,400};
+  std::vector<int> masses {15,20,30,50,80,100,150,200,250,300,350,400};
   for ( auto m: masses ){
     Plot_training_variables(tag,m);
   }
