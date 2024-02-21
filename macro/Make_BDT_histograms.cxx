@@ -4,8 +4,7 @@ void Make_BDT_histograms(TString filename,TString detvar="")
     std::cout << "Incorrect input file, needs to be test_ type" << std::endl;
     return;
   }
-  TString filename_no_ext = filename;
-  filename_no_ext.ReplaceAll(".root","");
+  // grab simulated mass from the filename
   int mass;
   TObjArray *tok = filename.Tokenize("_");
   for ( int i = 0; i < tok->GetEntries(); i++ ) {
@@ -31,7 +30,6 @@ void Make_BDT_histograms(TString filename,TString detvar="")
   
   TH1F *bkg_hist = new TH1F("bkg_hist","Test BDT bkg;Score;Entries",40,-10,10);
   TH1F *sig_hist = new TH1F("sig_hist","Test BDT sig;Score;Entries",40,-10,10);
-  double bin_width = 0.5;
   
   bkg_tree->Draw("bdt>>bkg_hist");
   sig_tree->Draw("bdt>>sig_hist");

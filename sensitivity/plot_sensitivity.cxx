@@ -43,7 +43,7 @@ void plot_sensitivity()
   TCanvas *c1 = new TCanvas();
   //TH2 * h2 = new TH2F("h2",";Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,10000,10,0.5e-4,2.5e-1);
   // zoomed in to make it look more like sensei limits figure
-  TH2 * h2 = new TH2F("h2","MicroBooNE preliminary: MC + overlay;Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,4000,10,9.5e-5,0.045);
+  TH2 * h2 = new TH2F("h2","Millicharge sensitivity;Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,4000,10,9.5e-5,0.045);
   h2->GetXaxis()->CenterTitle();
   h2->GetYaxis()->CenterTitle();
   c1->SetLogx();
@@ -62,16 +62,16 @@ void plot_sensitivity()
   limit_curve bebc("BEBC",kAzure-5);
   limit_curve chrm("CHARM II",kOrange+3);
 
-  mini.Draw("same");
-  mill.Draw("same");
+  //mini.Draw("same");
+  //mill.Draw("same");
   lsnd.Draw("same");
-  lhcc.Draw("same");
+  //lhcc.Draw("same");
   slac.Draw("same");
   argo.Draw("same");
   sens.Draw("same");
-  supk.Draw("same");
+  //supk.Draw("same");
   bebc.Draw("same");
-  chrm.Draw("same");
+  //chrm.Draw("same");
   
 
   // own limits (microboone)
@@ -90,64 +90,38 @@ void plot_sensitivity()
   gamma3d.SetLineStyle(1);
   gamma3d.SetTitle("#muBooNE normal thresholds (gamma3d)");
   //gamma3d.Draw("same LF");
-  limit_curve blip("blip",kGreen+2,false);
-  blip.SetLineStyle(2);
-  blip.SetTitle("#muBooNE normal thresholds (blipreco 30 step)");
-  //blip.Draw("same LF");
-  limit_curve blip10("blip_10rounds",kGreen+3,false);
-  blip10.SetLineStyle(3);
-  blip10.SetTitle("#muBooNE normal thresholds (blipreco 10 step)");
-  //blip10.Draw("same LF");
-  limit_curve blip50("blip_50rounds",kGreen+4,false);
-  blip50.SetLineStyle(4);
-  blip50.SetTitle("#muBooNE normal thresholds (blipreco 50 step)");
-  //blip50.Draw("same LF");
-  limit_curve blip100("blip_100rounds",kGreen-1,false);
-  blip100.SetLineStyle(5);
-  blip100.SetTitle("#muBooNE normal thresholds (blipreco 100 step)");
-  //  blip100.Draw("same LF");
-  limit_curve blipunbug("blip_unbug",kGreen-2,false);
-  blipunbug.SetLineStyle(6);
-  blipunbug.SetTitle("#muBooNE normal thresholds (blipreco unbugged)");
-  //blipunbug.Draw("same LF");
-  limit_curve blipunbug_100("blip_unbug_100",kGreen-3,false);
-  blipunbug_100.SetLineStyle(7);
-  blipunbug_100.SetTitle("MicroBooNE Blipreco3D");
-  //blipunbug_100.Draw("same LF");
   limit_curve blipunbug_150("blip_unbug_150",kGreen-4,false);
   blipunbug_150.SetLineStyle(8);
   blipunbug_150.SetTitle("MicroBooNE 2-blips");
   blipunbug_150.Draw("same LF");
 
+  limit_curve pawel_200mev("pawel_200mev",kGreen-2,false);
+  pawel_200mev.SetLineStyle(8);
+  pawel_200mev.SetTitle("Wirecell 1-interaction");
+  pawel_200mev.Draw("same LF");
+
   
   // legend
   TLegend *myleg = new TLegend(0.6,0.15,0.9,0.5);
   myleg->AddEntry(argo.get_tgraph());
-  myleg->AddEntry(mini.get_tgraph());
-  myleg->AddEntry(mill.get_tgraph());
+  //myleg->AddEntry(mini.get_tgraph());
+  //myleg->AddEntry(mill.get_tgraph());
   myleg->AddEntry(lsnd.get_tgraph());
-  myleg->AddEntry(lhcc.get_tgraph());
+  //myleg->AddEntry(lhcc.get_tgraph());
   myleg->AddEntry(slac.get_tgraph());
   myleg->AddEntry(sens.get_tgraph());
-  myleg->AddEntry(supk.get_tgraph());
+  //myleg->AddEntry(supk.get_tgraph());
   myleg->AddEntry(bebc.get_tgraph());
-  myleg->AddEntry(chrm.get_tgraph());
-  //myleg->AddEntry(syst.get_tgraph());
-  //myleg->AddEntry(no_syst.get_tgraph());
-  /*
-  myleg->AddEntry(gamma3d.get_tgraph());
-  myleg->AddEntry(blip.get_tgraph());
-  myleg->AddEntry(blip10.get_tgraph());
-  myleg->AddEntry(blip50.get_tgraph());
-  */
-  //myleg->AddEntry(blip100.get_tgraph());
-  //myleg->AddEntry(blipunbug.get_tgraph());
-  //myleg->AddEntry(blipunbug_100.get_tgraph());
+  //myleg->AddEntry(chrm.get_tgraph());
   myleg->AddEntry(blipunbug_150.get_tgraph());
+  myleg->AddEntry(pawel_200mev.get_tgraph());
   myleg->Draw("same");
 
   gStyle->SetOptStat(0);
-  c1->SaveAs("img/limits_nov23.pdf");
+  gSystem->Exec(Form("mkdir -p img/"));
+  TDatime dt;
+  c1->SaveAs(Form("img/sens_d%i_t%i.pdf",dt.GetDate(),dt.GetTime()));
+  c1->SaveAs(Form("img/sens_d%i_t%i.png",dt.GetDate(),dt.GetTime()));
 
   
 }
@@ -162,7 +136,7 @@ limit_curve::limit_curve(TString exp, Color_t col = kBlack, Bool_t pub = true)
   if ( published ) {
     filename = "published/"+exp+".dat";
   } else {
-    filename = "limits_nov23/"+exp+".txt";
+    filename = "mysensitivities/"+exp+".txt";
   }
   dat_file.open(filename);
   read_file();
