@@ -1,4 +1,6 @@
-std::pair<double,double> Plot_adc_preselection(TString filename)
+std::pair<double,double> Plot_adc_preselection(TString sample_directory,
+					       TString filename,
+					       TString tag)
 {
   int threshold {1000};
   int nhits {2};
@@ -6,38 +8,20 @@ std::pair<double,double> Plot_adc_preselection(TString filename)
   TString det_thres = "";
   if ( filename.Contains("def-th") ) det_thres = "def-th";
   if ( filename.Contains("low-th") ) det_thres = "low-th";
-  TString outdir;
-  TString outfile;
-  TObjArray *tok = filename.Tokenize("/");
-  for ( int i = 0; i < tok->GetEntries(); i++ ) {
-    TString t = ((TObjString*)(tok->At(i)))->String();
-    if ( i < tok->GetEntries()-1 ) outdir += (t+"/");
-    if ( i == tok->GetEntries()-1 ) outfile = t;
-    if ( t.Contains("_") ) {
-      TObjArray *tok2 = t.Tokenize("_");
-      for ( int j = 0; j < tok2->GetEntries(); j++ ) {
-	TString t2 = ((TObjString*)(tok2->At(j)))->String();
-	TString t_temp = t2;
-	if ( t_temp.Contains("kev") ) {
-	  t_temp.ReplaceAll("kev","");
-	  threshold = t_temp.Atoi();
-	} else if ( t_temp.Contains("mev") ) {
-	  t_temp.ReplaceAll("mev","");
-	  mass = t_temp.Atoi();
-	} else if ( t_temp.Contains("hits") ) {
-	  t_temp.ReplaceAll("hits","");
-	  nhits = t_temp.Atoi();
-	}
-      }
-    }
-  }
-  outdir.ReplaceAll("root","img");
-  outdir.ReplaceAll("systematics","img");
+  TString outdir = sample_directory;
+  TString outfile = filename;
+  outdir.ReplaceAll("samples","img");
+  outdir.ReplaceAll("raw_sample","preselection");
   outfile.ReplaceAll(".root",".pdf");
-  outfile.ReplaceAll("spacepoints","spacepoints_adc");
-  outfile.ReplaceAll("ntuple","spacepoints_adc");
+  outfile.ReplaceAll("spacepoints","preselection_adc");
+  outfile.ReplaceAll("ntuple","preselection_adc");
+  outdir+="/"+tag+"/";
   std::cout << "outdir, outfile " << outdir << " " << outfile << std::endl;
-  TFile *f = new TFile(filename);
+  TFile *f = new TFile(Form("%s/%s",
+			    sample_directory.Data(),
+			    filename.Data()
+			    )
+		       );
 
   // POT information
   double tot_pot = 0;
@@ -67,12 +51,13 @@ std::pair<double,double> Plot_adc_preselection(TString filename)
   bkg->SetLineColor(kRed);
   TH1F * sig = new TH1F("sig","",100,0,4);
 
-  auto n_bkg = tree->Draw("log10(pl2_integs)>>bkg","run > 0");
+  auto n_bkg = tree->Draw("log10(pl2_integs)>>bkg","run > 0","goff");
+  std::cout << "n_bkg: " << n_bkg << std::endl;
   h0 = (TH1F*)bkg->Clone(); // get correct vertical scale for histo
   TString parameters = Form("%s %ikeV %ihits %iMeV",det_thres.Data(),threshold, nhits,mass);
   h0->SetTitle(Form("%s;Log_{10}(plane 2 ADC)",parameters.Data()));
-  h0->Draw();
-  tree->Draw("log10(pl2_integs)>>bkg","run > 0 && pl2_true_integs==-999","same");
+  //h0->Draw();
+  tree->Draw("log10(pl2_integs)>>bkg","run > 0 && (pl2_true_integs==-999 || pl2_true_integs == 0.0)","same");
   auto n_sig = tree->Draw("log10(pl2_true_integs)>>sig","pl2_true_integs!=-999","same");
 
   TLegend *myleg = new TLegend(0.12,0.65,0.35,0.9);
@@ -94,7 +79,7 @@ std::pair<double,double> Plot_adc_preselection(TString filename)
   double sensitivity = 0;
   int best_low = 0;
   int best_high = 0;
-  for ( int low = 1; low < 101; low++ ) {
+  for ( int low = 5; low < 101; low++ ) {
     for ( int high = low; high < 100; high++ ) {
       range_bkg = bkg->Integral(low,high);
       range_sig = sig->Integral(low,high);
@@ -119,7 +104,7 @@ std::pair<double,double> Plot_adc_preselection(TString filename)
   std::cout << Form("sig %.3f, bkg %.3f\n", sig->Integral(best_low,best_high), bkg->Integral(best_low,best_high));
   double lowx = sig->GetBinLowEdge(best_low);
   double highx = sig->GetBinLowEdge(best_high+1);
-  
+
   TLine * locut = new TLine();
   TLine * hicut = new TLine();
   locut->SetLineWidth(2);
@@ -132,7 +117,6 @@ std::pair<double,double> Plot_adc_preselection(TString filename)
   TLatex tledges;
   tlsens.DrawLatexNDC(0.12,0.55,Form("s/#sqrt{s+b} = %.3f",sensitivity));
   tledges.DrawLatexNDC(0.12,0.4,Form("#splitline{Low edge: %.3f}{High edge: %.3f}",lowx,highx));
-  gSystem->Exec("mkdir -p "+outdir);
   c1->SaveAs(outdir+outfile);
   outfile.ReplaceAll(".pdf",".png");
   c1->SaveAs(outdir+outfile);

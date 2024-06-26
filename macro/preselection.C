@@ -1,11 +1,24 @@
 #include "Plot_adc_preselection.cxx"
 
 //void preselection(const char* fn = "spacepoints_mc.root") {
-void preselection(TString fn = "spacepoints_mc.root") {
-  std::pair<double,double> cuts = Plot_adc_preselection(fn);
+void preselection(TString sample_directory,
+		  TString input_filename = "spacepoints_mc.root",
+		  TString tag = "_generictag",
+		  bool b_data = false) {
+  std::pair<double,double> cuts = Plot_adc_preselection(sample_directory,
+							input_filename,
+							tag);
+  if ( b_data ) {
+    cuts.first = 1.7;
+    cuts.second= 3.6;
+    std::cout << "DOING DATA" << std::endl;
+  }
+  cuts.first = 1.7;
+  cuts.second= 3.6;
+
   std::cout << "From Plot_adc_preselection obtained following cuts: " <<
     cuts.first << " " << cuts.second << std::endl;
-  TFile *f = new TFile(fn);
+  TFile *f = new TFile(sample_directory+"/"+input_filename);
   TTree *t = (TTree*)f->Get("ana/t");
   if ( t == nullptr ) {
     std::cout << "WARNING: using old gallery script instead of analyzer\n"
@@ -35,21 +48,30 @@ void preselection(TString fn = "spacepoints_mc.root") {
   t->SetBranchAddress("elec_E",&true_enes);
   t->SetBranchAddress("pl2_true_integs",&true_adcs);
 
-  TString output_filename {Form("%s_output.root",fn.Data())};
-  TString infile_compare = fn;
+  TString output_filename {Form("%s_output.root",input_filename.Data())};
+  TString infile_compare = input_filename;
+  
   if ( infile_compare != "spacepoints.root" ) {
     output_filename = infile_compare;
     output_filename.ReplaceAll("spacepoints","preselection");
     output_filename.ReplaceAll("ntuple","preselection");
+    //output_filename.ReplaceAll("samples",Form("samples/%s/preselection/%s",sample.Data(),tag.Data()));
   }
   std::cout << output_filename << std::endl;
   float train_fraction = 0.7;
   if ( infile_compare.Contains("detvar") ) {
     train_fraction = 0.0;
   }
+  sample_directory.ReplaceAll("raw_sample","preselection");
+  TString output_dir = Form("%s/%s",
+			    sample_directory.Data(),
+			    tag.Data()
+			    );
+  TFile *of = new TFile(Form("%s/%s",
+			     output_dir.Data(),
+			     output_filename.Data()),
+			"recreate");
   
-  TFile *of = new TFile(output_filename,"recreate");
-
   // POT and normalization from spacepoints file
   TTree *pot_tree = (TTree*)f->Get("ana/pottree");
   TTree *o_pot_tree = new TTree("total_pot","total pot and events from sample");
@@ -74,6 +96,7 @@ void preselection(TString fn = "spacepoints_mc.root") {
   TTree *ot2a = new TTree("tsig_train","signal training");
   TTree *ot1b = new TTree("tbg_test","background");
   TTree *ot2b = new TTree("tsig_test","signal");
+  TTree *otc  = new TTree("tdata","data");
 
   double ot_px1;
   double ot_py1;
@@ -128,7 +151,7 @@ void preselection(TString fn = "spacepoints_mc.root") {
   int ot_nhO_closest_ahead;
   int ot_nhM_closest_ahead;
 
-  for(auto ot : { ot1a, ot1b, ot2a, ot2b }) {
+  for(auto ot : { ot1a, ot1b, ot2a, ot2b, otc }) {
   ot->Branch("run",&run);
   ot->Branch("evt",&evt);
 
@@ -351,30 +374,39 @@ void preselection(TString fn = "spacepoints_mc.root") {
 
         }
 
-        auto const& ot = (it1 != it2 && it1 < 2 && it2 < 2) ? (train_sig ? ot2a : ot2b) : (train_bg ? ot1a : ot1b);
-        ot->Fill();
+	if ( b_data ) {
+	  auto const& ot = otc;
+	  ot->Fill();
+	} else {
+	  auto const& ot = (it1 != it2 && it1 < 2 && it2 < 2) ? (train_sig ? ot2a : ot2b) : (train_bg ? ot1a : ot1b);
+	  ot->Fill();
+	}
       }
     }
   }
   of->cd();
-  for(auto ot : { ot1a, ot1b, ot2a, ot2b }) {
-    ot->SetAlias("distinct_truth","it1+it2==1");
-    ot->SetAlias("thetadeg","theta*180/pi");
-    ot->SetAlias("phideg","phi*180/pi");
-    ot->SetAlias("true_mean_thetadeg","2.76132e+01");
-    ot->SetAlias("true_mean_sintheta_phideg","2.79794e+00");
-    ot->SetAlias("sigma_thetadeg","4.28918e-01");
-    ot->SetAlias("mean_thetadeg","2.17494e-01");
-    ot->SetAlias("sigma_sintheta_phideg","8.89466e-01");
-    ot->SetAlias("mean_sintheta_phideg","1.24913e-01");
-    ot->SetAlias("thetapull","(thetadeg-true_mean_thetadeg-mean_thetadeg)/sigma_thetadeg");
-    ot->SetAlias("phipull","(sin(theta)*phideg - true_mean_sintheta_phideg - mean_sintheta_phideg)/sigma_sintheta_phideg");
-    ot->SetAlias("anglepull","sqrt(pow(thetapull,2)+pow(phipull,2))");
-    //ot->SetAlias("mindist_closest","min(min(dca_behind,dca_mid),dca_ahead)");
-    //ot->SetAlias("mindist_adc_closest","(mindist_closest==dca_behind)*dca_adc_behind+(mindist_closest==dca_mid)*dca_adc_mid+(mindist_closest==dca_ahead)*dca_adc_ahead");
-    ot->Write();
+  if ( b_data ) {
+    otc->Write();
+  } else {
+    for(auto ot : { ot1a, ot1b, ot2a, ot2b }) {
+      ot->SetAlias("distinct_truth","it1+it2==1");
+      ot->SetAlias("thetadeg","theta*180/pi");
+      ot->SetAlias("phideg","phi*180/pi");
+      ot->SetAlias("true_mean_thetadeg","2.76132e+01");
+      ot->SetAlias("true_mean_sintheta_phideg","2.79794e+00");
+      ot->SetAlias("sigma_thetadeg","4.28918e-01");
+      ot->SetAlias("mean_thetadeg","2.17494e-01");
+      ot->SetAlias("sigma_sintheta_phideg","8.89466e-01");
+      ot->SetAlias("mean_sintheta_phideg","1.24913e-01");
+      ot->SetAlias("thetapull","(thetadeg-true_mean_thetadeg-mean_thetadeg)/sigma_thetadeg");
+      ot->SetAlias("phipull","(sin(theta)*phideg - true_mean_sintheta_phideg - mean_sintheta_phideg)/sigma_sintheta_phideg");
+      ot->SetAlias("anglepull","sqrt(pow(thetapull,2)+pow(phipull,2))");
+      //ot->SetAlias("mindist_closest","min(min(dca_behind,dca_mid),dca_ahead)");
+      //ot->SetAlias("mindist_adc_closest","(mindist_closest==dca_behind)*dca_adc_behind+(mindist_closest==dca_mid)*dca_adc_mid+(mindist_closest==dca_ahead)*dca_adc_ahead");
+      ot->Write();
+    }
   }
   delete of;
   delete f;
-  std::cout << "Saved file " << output_filename << std::endl;
+  std::cout << "Saved file " << output_dir << " " << output_filename << std::endl;
 }

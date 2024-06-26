@@ -15,7 +15,7 @@ Each of the following subheadings describes a stage in processing and each of th
 
 The repository has a number of directories in it. 
 
-- `models`
+- `models/`
   
   Contains `.txt` and `.json` files relating to a specific BDT **model**. Models are a specific trained BDT, they are determined by the sample used for training, the **features** used for training, and the (xgboost) configuration used for the training. Model names are usually acompanied by a **tag** which usually specifies the _date_ in which they were trained (and hopefully in my notes there would be an entry with some more details about what makes that training special). 
   
@@ -23,19 +23,19 @@ The repository has a number of directories in it.
   
   The name of the files within should be self-explanatory. the .json file is the BDT model itself which can be loaded into a new  xgboost session and applied to a different sample. The _featmap_ text file is the list of features that were used for training and will be checked when applying this trained BDT to a new sample. They are typically used in the macro previous to obtainint the BDT scores as a compatibility check: if a sample you want to test against your trained BDT doesn't have the same variables, it will be impossible to assign a BDT score to them. Finally the _dump_ text file I'm not sure what it does but when training xgboost gives you the option to dump, so it's probably some information that could be used in the event of needing to debug.
 
-- `root`
+- `samples/`
 
-	Contains each stage of the processed ROOT files for each different model (with the exception of systematics which has its own subdirectory (although this should change)).
+	Contains each stage of the processed ROOT files for each different model.
 
-- `img`
+- `img/`
 
 	Contains all of the figures generated in all of the processing (except for sensitivities/limits, which have their own subdirectory), separated by model.
 
-- `macros`
+- `macros/`
 
 	Contains macros which will be called from one of the main programs in the root directory. The goal (for organisation's sake) is not to put anything here that you would want to execute yourself by hand, although they should be able to be run in a standalone manner as well.
 
-- `sensitivity`
+- `sensitivity/`
 
 	Here is where sensitivities and limits are obtained. This part of the code works more or less independently of the others as it was its own repository at some point. It runs pyhf taking as inputs histogram files made with the main code, and makes the final parameter-space figures.
 	
