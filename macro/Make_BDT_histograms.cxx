@@ -1,71 +1,72 @@
-void Make_BDT_histograms(TString filename,TString detvar="")
+void Make_BDT_histograms(TString model_sample,TString sample = "", bool b_data = true)
 {
-  if ( !filename.Contains("test") ) {
-    std::cout << "Incorrect input file, needs to be test_ type" << std::endl;
-    return;
-  }
-  // grab simulated mass from the filename
-  int mass;
-  TObjArray *tok = filename.Tokenize("_");
-  for ( int i = 0; i < tok->GetEntries(); i++ ) {
-    TString t = ((TObjString*)(tok->At(i)))->String();
-    if ( t.Contains("mev") ) {
-      t.ReplaceAll("mev","");
-      mass = t.Atoi();
-    }
-  }
-  std::cout << "Mass: " << mass;
+  
   bool fVerbose {false};
-
-  
-  TFile *f = new TFile(filename);
-
+  TFile *f = new TFile(model_sample);
+  /*
   TTree *pot;
-  if ( detvar == "" ) {
-    pot = (TTree*)f->Get("total_pot");
-  }
-  
-  TTree* bkg_tree = (TTree*)f->Get("test_bkg");
-  TTree* sig_tree = (TTree*)f->Get("test_sig");
+  pot = (TTree*)f->Get("total_pot");
+  */
+  TTree* bkg_tree;
+  TTree* sig_tree;
+  bkg_tree = (TTree*)f->Get("train_bkg");
+  sig_tree = (TTree*)f->Get("train_sig");
   
   TH1F *bkg_hist = new TH1F("bkg_hist","Test BDT bkg;Score;Entries",40,-10,10);
   TH1F *sig_hist = new TH1F("sig_hist","Test BDT sig;Score;Entries",40,-10,10);
-  
-  bkg_tree->Draw("bdt>>bkg_hist");
-  sig_tree->Draw("bdt>>sig_hist");
+  TH1F *data_hist = new TH1F("data_hist","Test BDT sig;Score;Entries",40,-10,10);
 
-  TString out_filename = filename;
-  out_filename.ReplaceAll("test","hist");
+  bkg_tree->Draw("bdt>>bkg_hist","","goff");
+  sig_tree->Draw("bdt>>sig_hist","","goff");
+  TTree * data_tree;
+  if ( b_data ) {
+    TFile * fdata= new TFile(sample);
+    //fdata->cd();
+    data_tree = (TTree*)fdata->Get("tdata");
+    //std::cout << "data entries1:  "  << data_tree->GetEntries() << std::endl;
+    f->cd();
+    data_tree->Draw("bdt>>data_hist","","goff");
+    std::cout << "data entries:  "  << data_hist->GetEntries() << std::endl;
+  }
+
+  TString out_filename = sample;
+  out_filename.ReplaceAll("BDT_scores","BDT_scores_hist");
   TFile outfile(out_filename,"recreate");
   // save the histograms, not the trees
   bkg_hist->Write();
   sig_hist->Write();
+  /*
   TTree * newpottree;
-  if ( detvar == "" ) {
-    newpottree = pot->CloneTree();
-    newpottree->Write();
-  }
-    
+  newpottree = pot->CloneTree();
+  newpottree->Write();
+  */
   TCanvas c3;
   gStyle->SetOptStat(0);
   TH1F *h_base = new TH1F("h_base","Test BDT bkg;Score;Entries",40,-10,10);
   h_base->Draw();
-  h_base->SetTitle(Form("Mass %i MeV BDT score;BDT score;Entries",mass));
-  if ( detvar != "" ) {
-    h_base->SetTitle(Form("%iMeV - %s;BDT score;Entries",mass,detvar.Data()));
-  }
   h_base->SetMaximum(std::max(sig_hist->GetMaximum(),bkg_hist->GetMaximum())*1.1);
   bkg_hist->SetLineColor(kRed);
   sig_hist->SetLineColor(kBlue);
   sig_hist->Draw("same");
   bkg_hist->Draw("same");
   sig_hist->SetMinimum(0);
+
+  if ( b_data ) {
+    //data_hist->Scale(0.12);
+    data_hist->Scale(1.2);
+    data_hist->SetMarkerStyle(kFullCircle);
+    data_hist->SetMarkerSize(0.5);
+    data_hist->Draw("same E0");
+    for ( int i = 0; i < data_hist->GetNbinsX(); i++ ) {
+      std::cout << i << " " << data_hist->GetBinContent(i) << std::endl;
+    }
+		
+
+  }
+  
   TString out_pdffile = out_filename;
-  out_pdffile.ReplaceAll("root/","img/");
-  out_pdffile.ReplaceAll("systematics/","img/");
+  out_pdffile.ReplaceAll("samples/","img/");
   out_pdffile.ReplaceAll(".root",".pdf");
-  tok = out_pdffile.Tokenize("/");
-  gSystem->Exec("mkdir -p img/"+((TObjString*)(tok->At(1)))->String());
   c3.SaveAs(out_pdffile);
 
 }
