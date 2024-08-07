@@ -10,7 +10,7 @@ private:
   TGraph *limit;
 public:
   limit_curve();
-  limit_curve(TString exp, Color_t col = kBlack, Bool_t pub = true);
+  limit_curve(TString exp, TString title, Color_t col = kBlack, Bool_t pub = true);
   ~limit_curve() { delete limit;};
   TString experiment {"Experiment"};
   Color_t color {kBlack};
@@ -34,13 +34,30 @@ public:
   void SetLineStyle(int l) {
     this->get_tgraph()->SetLineStyle(l);
   }
+  void SetMarkerStyle(int l) {
+    this->get_tgraph()->SetMarkerStyle(l);
+  }
+  void SetMarkerColor(int l) {
+    this->get_tgraph()->SetMarkerColor(l);
+  }
 };
+
+void plot_vert_line(double x, TString label = "",double y = 1.4e-4)
+{
+  TLine *l1 = new TLine(x,9.5e-5,x,0.045);
+  l1->SetLineStyle(2);
+  l1->Draw();
+
+  TLatex *tl = new TLatex();
+  tl->SetTextFont(132);
+  tl->DrawLatex(x-x*0.09,y,label);
+}
 
 // main
 void plot_sensitivity()
 {
   // base canvas
-  TCanvas *c1 = new TCanvas();
+  TCanvas *c1 = new TCanvas("c1","c1",900,600);
   //TH2 * h2 = new TH2F("h2",";Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,10000,10,0.5e-4,2.5e-1);
   // zoomed in to make it look more like sensei limits figure
   TH2 * h2 = new TH2F("h2","Millicharge sensitivity;Mass m_{#chi} (MeV);Millicharge #epsilon = Q/e",10,10,4000,10,9.5e-5,0.045);
@@ -51,70 +68,101 @@ void plot_sensitivity()
   h2->Draw();
 
   // published limits
-  limit_curve argo("ArgoNeuT",kTeal);
-  limit_curve mini("MiniBooNE",kViolet);
-  limit_curve mill("milliQan demonstrator",kBlue);
-  limit_curve lsnd("LSND",kBlack);
-  limit_curve lhcc("LHC",kGray);
-  limit_curve slac("SLAC",kRed);
-  limit_curve sens("SENSEI",kOrange);
-  limit_curve supk("Super K PB+MD",kMagenta);
-  limit_curve bebc("BEBC",kAzure-5);
-  limit_curve chrm("CHARM II",kOrange+3);
+  limit_curve argo("ArgoNeuT","ArgoNeuT",kTeal);
+  limit_curve mini("MiniBooNE","MiniBooNE",kViolet);
+  limit_curve mill("milliQan demonstrator","milliQan demonstrator",kBlue);
+  limit_curve lsnd("LSND","LSND",kBlack);
+  limit_curve lhcc("LHC","LHC",kGray);
+  limit_curve slac("SLAC","SLAC",kRed);
+  limit_curve sens("SENSEI","SENSEI",kOrange);
+  limit_curve supk("Super K PB+MD","Super K PB+MD",kMagenta);
+  limit_curve bebc("BEBC","BEBC",kAzure-5);
+  limit_curve chrm("CHARM II","CHARM II",kOrange+3);
 
-  //mini.Draw("same");
-  //mill.Draw("same");
-  lsnd.Draw("same");
-  //lhcc.Draw("same");
-  slac.Draw("same");
-  argo.Draw("same");
-  sens.Draw("same");
-  //supk.Draw("same");
-  bebc.Draw("same");
-  //chrm.Draw("same");
+  TLegend *myleg = new TLegend(0.64,0.12,0.89,0.55);
+  myleg->SetBorderSize(0);
+
+  //mini.Draw("same");  myleg->AddEntry(mini.get_tgraph());
+  //mill.Draw("same");  myleg->AddEntry(mill.get_tgraph());
+  lsnd.Draw("same");  myleg->AddEntry(lsnd.get_tgraph());
+  //lhcc.Draw("same");  myleg->AddEntry(lhcc.get_tgraph());
+  slac.Draw("same"); myleg->AddEntry(slac.get_tgraph());
+  argo.Draw("same");  myleg->AddEntry(argo.get_tgraph());
+  sens.Draw("same");  myleg->AddEntry(sens.get_tgraph());
+  //supk.Draw("same");  myleg->AddEntry(supk.get_tgraph());
+  bebc.Draw("same");  myleg->AddEntry(bebc.get_tgraph());
+  //chrm.Draw("same");  myleg->AddEntry(chrm.get_tgraph());
   
 
-  // own limits (microboone)
+
+  limit_curve th_5000("15mev_5000kev","Wirecell 1-interaction 5000kev min. recoil",kGreen-2,false);
+  th_5000.SetLineStyle(8);
+  //th_5000.Draw("same LF"); myleg->AddEntry(th_5000.get_tgraph());
+
+  limit_curve th_30000("15mev_30000kev","Wirecell 1-interaction 30000kev min. recoil",kRed-2,false);
+  th_30000.SetLineStyle(8);
+  //th_30000.Draw("same LF"); myleg->AddEntry(th_30000.get_tgraph());
+
+
+  limit_curve th_20000("15mev_20000kev_pawelhistts","#splitline{Wirecell 1-interaction}{20000kev min. recoil}",kBlue-2,false);
+  th_20000.SetLineStyle(8);
+  //th_20000.Draw("same LF"); myleg->AddEntry(th_20000.get_tgraph());
+
+  limit_curve th_20000_cm("20000kev_combinedmasses_syst",
+			  //"#splitline{Wirecell 1-interaction}{All parents}",kMagenta,false);
+			  "Wirecell 1-interaction with systematics",kMagenta,false);
+  th_20000_cm.SetLineStyle(1); th_20000_cm.SetMarkerStyle(kFullTriangleUp); 
+  th_20000_cm.Draw("same LP"); myleg->AddEntry(th_20000_cm.get_tgraph());
+
+  limit_curve th_20000_noether("20000kev_combinedmasses_noether_240730",
+			  //"#splitline{Wirecell 1-interaction}{All parents}",kMagenta,false);
+			  "Wirecell 1-interaction",kMagenta-5,false);
+  th_20000_noether.SetLineStyle(1); th_20000_noether.SetMarkerStyle(kFullTriangleDown); 
+  th_20000_noether.Draw("same LP"); myleg->AddEntry(th_20000_noether.get_tgraph());
+
+  
   /*
-  limit_curve syst("def-th_no-syst",kGreen+1,false);
-  syst.SetLineStyle(1);
-  syst.SetTitle("#muBooNE normal thresholds (no systematics)");
-  syst.Draw("same LF");
-  
-  limit_curve no_syst("def-th_full-syst",kGreen+2,false);
-  no_syst.SetLineStyle(2);
-  no_syst.SetTitle("#muBooNE normal thresholds (with full systematics)");
-  no_syst.Draw("same LF");
+  limit_curve th_20000_cm_t70("20000kev_combinedmasses_truth70",
+			  "Truth 70%",kBlue-2,false);
+  th_20000_cm_t70.SetLineStyle(8); th_20000_cm_t70.SetMarkerStyle(kFullTriangleUp); 
+  th_20000_cm_t70.Draw("same LFP"); myleg->AddEntry(th_20000_cm_t70.get_tgraph());
   */
-  limit_curve gamma3d("gamma3d",kGreen+1,false);
-  gamma3d.SetLineStyle(1);
-  gamma3d.SetTitle("#muBooNE normal thresholds (gamma3d)");
-  //gamma3d.Draw("same LF");
-  limit_curve blipunbug_150("blip_unbug_150",kGreen-4,false);
-  blipunbug_150.SetLineStyle(8);
-  blipunbug_150.SetTitle("MicroBooNE 2-blips");
-  blipunbug_150.Draw("same LF");
 
-  limit_curve pawel_200mev("pawel_200mev",kGreen-2,false);
-  pawel_200mev.SetLineStyle(8);
-  pawel_200mev.SetTitle("Wirecell 1-interaction");
-  pawel_200mev.Draw("same LF");
+
+
+
+  /*
+    // per parent
+  limit_curve pi0("20000kev_combinedmasses_per_parent_pi0",
+		  "#pi^{0} only",kOrange,false);
+  pi0.SetLineStyle(8); pi0.SetMarkerStyle(kFullDiamond); pi0.SetMarkerColor(kOrange);
+  pi0.Draw("same LFP"); myleg->AddEntry(pi0.get_tgraph());
+
+  limit_curve eta("20000kev_combinedmasses_per_parent_eta",
+		  "#eta only",kRed,false);
+  eta.SetLineStyle(8); eta.SetMarkerStyle(kFullTriangleUp); eta.SetMarkerColor(kRed); 
+  eta.Draw("same LFP"); myleg->AddEntry(eta.get_tgraph());
+
+  limit_curve etp("20000kev_combinedmasses_per_parent_etp",
+		  "#eta' only",kBlue,false);
+  etp.SetLineStyle(8); etp.SetMarkerStyle(kFullTriangleDown); etp.SetMarkerColor(kBlue); 
+  etp.Draw("same LFP"); myleg->AddEntry(etp.get_tgraph());
+
+  limit_curve rho("20000kev_combinedmasses_per_parent_rho",
+		  "#rho only",kGreen,false);
+  rho.SetLineStyle(8); rho.SetMarkerStyle(kFullCircle);rho.SetMarkerColor(kGreen); 
+  rho.Draw("same LFP"); myleg->AddEntry(rho.get_tgraph());
+  */
 
   
-  // legend
-  TLegend *myleg = new TLegend(0.6,0.15,0.9,0.5);
-  myleg->AddEntry(argo.get_tgraph());
-  //myleg->AddEntry(mini.get_tgraph());
-  //myleg->AddEntry(mill.get_tgraph());
-  myleg->AddEntry(lsnd.get_tgraph());
-  //myleg->AddEntry(lhcc.get_tgraph());
-  myleg->AddEntry(slac.get_tgraph());
-  myleg->AddEntry(sens.get_tgraph());
-  //myleg->AddEntry(supk.get_tgraph());
-  myleg->AddEntry(bebc.get_tgraph());
-  //myleg->AddEntry(chrm.get_tgraph());
-  myleg->AddEntry(blipunbug_150.get_tgraph());
-  myleg->AddEntry(pawel_200mev.get_tgraph());
+  
+  /*
+  // vertical lines for meson death
+  plot_vert_line(67.5,  "#frac{#it{M}_{#pi^{0}}}{2}");
+  plot_vert_line(279.,"#frac{#it{M}_{#eta}}{2}");
+  plot_vert_line(385.0,"#frac{#it{M}_{#rho}}{2}",0.0007);
+  plot_vert_line(478.89,"#frac{#it{M}_{#eta'}}{2}",0.004);
+  */
   myleg->Draw("same");
 
   gStyle->SetOptStat(0);
@@ -128,7 +176,7 @@ void plot_sensitivity()
 
 // class member implementation
 limit_curve::limit_curve(){};
-limit_curve::limit_curve(TString exp, Color_t col = kBlack, Bool_t pub = true)
+limit_curve::limit_curve(TString exp, TString title, Color_t col = kBlack, Bool_t pub = true)
 {
   experiment = exp;
   published = pub;
@@ -142,6 +190,7 @@ limit_curve::limit_curve(TString exp, Color_t col = kBlack, Bool_t pub = true)
   read_file();
   set_color(col);
   fill_tgraph();
+  this->SetTitle(title);
 }
 
 void limit_curve::read_file()
@@ -174,7 +223,7 @@ void limit_curve::fill_tgraph()
   limit->SetLineWidth(3);
   limit->SetTitle(experiment);
   if ( !published ) { // own limits filled
-    limit->SetFillColorAlpha(color,0.2);
+    limit->SetFillColorAlpha(color,0.1);
   }
 }
 

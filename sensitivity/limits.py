@@ -232,8 +232,10 @@ def get_limit(directory, filename, mass, use_systematics=False):
 
     # observations = background only
     bkg_bins = [ i+j for i,j in zip(bkg0.get_hist_values(),bkg1.get_hist_values())] # one histogram combining sum of all bkgs
+    print(bkg_bins)
     observations = bkg_bins + model.config.auxdata
 
+    print("Lenghts: ",len(observations),len(bkg_bins))
 
     print("\nObservations")
     print(observations)
