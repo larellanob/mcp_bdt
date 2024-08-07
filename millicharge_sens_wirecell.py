@@ -20,6 +20,12 @@ def get_CL_range(mass,observations, model,unbounded_bounds,cl):
     continuously raise high_end until obs_limit is lower than it
 
     '''
+    print("______________________ debugging get_CL_range -______________________")
+    print(mass)
+    print(observations)
+    print(model)
+    print(unbounded_bounds)
+    print(cl)
     alpha = round(1-0.01*cl,2)
     low_end  = 0.00001 # lower bound of mu (POI)
     high_end = 1 # upper bound of mu (POI)
@@ -47,13 +53,14 @@ def get_CL_range(mass,observations, model,unbounded_bounds,cl):
         elif iterations > 30:
             delta_iter = iterations*10
             high_end   += delta_iter
+        else:
+            high_end += delta_iter
         poi_values = np.linspace(low_end,high_end,3)
         #print("about to call up lim")
         obs_limit, exp_limits = pyhf.infer.intervals.upper_limits.upper_limit(
             observations,model,poi_values,level=alpha,par_bounds=unbounded_bounds
         )
-        print(iterations,"iterations. high end =",high_end,"obs limit =",obs_limit)
-        
+        print(iterations,"iterations. low end =",low_end,", high end =",high_end,"obs limit =",obs_limit)
     print("passed while")
     print("Final: high end =",high_end,"obs limit =",obs_limit)
     #return np.linspace(low_end,2*high_end,10)
@@ -64,7 +71,7 @@ def get_CL_range(mass,observations, model,unbounded_bounds,cl):
     up_range = obs_limit+obs_limit/2.
     return np.linspace(lo_range,up_range,50)
 
-def get_limit(directory,filename,mass,use_systematics=False,verbose = False):
+def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
 
     print("\nSensitivity for mass %.1f"%(mass))
 
@@ -206,11 +213,34 @@ def get_limit(directory,filename,mass,use_systematics=False,verbose = False):
         print(model)
         print(json.dumps(model.spec, indent=2))
 
+    # systematics
+    if use_systematics:
+        print("using Systematics")
+
+        syst_file = "/gluster/data/microboone/millicharge/wirecell/30MEV.root"
+        syst_uprt = uproot.open(syst_file)
+        quad = syst_uprt["h_quad"].values().tolist()
+        print("quad:")
+        print(quad)
+
+        # we need to convert this "ratio" uncertainty into an absolute one
+        data = model.spec['channels'][0]['samples'][0]['data'] #sample 0 is signal
+        absolute = []
+        for i in range(0,len(data)):
+            absolute.append(abs(data[i]*quad[i]))
+        # give it appropriate dictionary format to add to the model
+        new_entry = {'name':'quadrature_30mev','type':'shapesys', 'data': absolute}
+        # add systematics as modifier
+        model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
+        print("added systematics in quadrature, before and after:")
+        print(data)
+        print(absolute)
+        
     # suggested initial parameters
     init_pars = model.config.suggested_init()
     # extend bounds
     unbounded_bounds = model.config.suggested_bounds()
-    unbounded_bounds[model.config.poi_index] = (0, 1e10) # set large number for weak signals
+    unbounded_bounds[model.config.poi_index] = (0, 100000000000.0) # set large number for weak signals
     if verbose == True:
         print("\nSuggested bounds:",model.config.suggested_bounds())
         print("\nInitial parameters:",init_pars)
@@ -344,7 +374,9 @@ def get_limit(directory,filename,mass,use_systematics=False,verbose = False):
 
 all_masses = [15.,20.,30.,50.,80.,100.,150.,200.,250.,300.,350.,400.]
 meson  = 'rho'
+meson = ""
 masses = all_masses
+#masses = [50.]
 if meson == 'pi0':
     masses = [15.,20., 30., 50.]
 if meson == 'eta':
@@ -378,15 +410,14 @@ exp_limits = []
 
 #masses = [400.]
 #model = '20000kev_1hits_15mev'
-#model = '20000kev_1hits_combinedmasses'
-model = '20000kev_combinedmass_per_parent_'+meson
-
+model = '20000kev_1hits_combinedmasses'
+#model = '20000kev_combinedmass_per_parent_'+meson
 
     
 for m in masses:
     #directory = "root/MillichargeGamma3D_run1-2a-2b-3a/"
     #filename = "hist_BDT_scores_%imev.root"%m
-    directory = f"/home/luciano/Physics/manchester/wirecell_allmasses/img/{model}/"
+    directory = f"/gluster/data/microboone/millicharge/sensitivity/{model}/"
     #name_of_the_mass = model.replace("combinedmasses",f'{int(m)}mev')
     #filename  = f"{name_of_the_mass}.root"
     filename  = f"{model}_{int(m)}mev.root"
