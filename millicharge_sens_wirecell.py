@@ -7,9 +7,9 @@ import pathlib
 import json
 import uproot
 from math import sqrt
+import time
 
-
-def get_CL_range(mass,observations, model,unbounded_bounds,cl):
+def get_CL_range(mass,observations, model,unbounded_bounds,cl,fast_mode = False):
     '''This function obtains a quick range of values for the parameter
     of interest (POI) mu by performing upper_limits.upper_limit on
     just three points, bound by low_end and high_end, such that
@@ -20,16 +20,19 @@ def get_CL_range(mass,observations, model,unbounded_bounds,cl):
     continuously raise high_end until obs_limit is lower than it
 
     '''
-    print("______________________ debugging get_CL_range -______________________")
-    print(mass)
-    print(observations)
-    print(model)
-    print(unbounded_bounds)
-    print(cl)
+    debug = True
+    if debug:
+        print("______________________ debugging get_CL_range -______________________")
+        print(mass)
+        print(observations)
+        print(model)
+        print(unbounded_bounds)
+        print(cl)
     alpha = round(1-0.01*cl,2)
     low_end  = 0.00001 # lower bound of mu (POI)
-    high_end = 1 # upper bound of mu (POI)
+    high_end = 0.01 # upper bound of mu (POI)
     obs_limit = 20 # value of mu at which CLs(mu) = 0.1
+    '''
     if mass < 70:
         high_end = 0.1
     elif mass >= 70 and mass < 150:
@@ -40,17 +43,18 @@ def get_CL_range(mass,observations, model,unbounded_bounds,cl):
     elif mass >= 300 and mass < 400:
         high_end = 200.0
         obs_limit = 250.0
+    '''
     iterations = 0
-    delta_iter = 0.2
-    print("about to enter while")
-    #return np.linspace(low_end,high_end,50)
-    print("Initial: high end =",high_end,"obs limit =",obs_limit)
+    delta_iter = 0.01
+    if debug:
+        print("about to enter while")
+        print("Initial: high end =",high_end,"obs limit =",obs_limit)
     while obs_limit >= high_end:
         iterations += 1
         if iterations > 3:
-            delta_iter = iterations*1.5
+            delta_iter = delta_iter*1.5
             high_end   += delta_iter
-        elif iterations > 30:
+        elif iterations > 10:
             delta_iter = iterations*10
             high_end   += delta_iter
         else:
@@ -60,20 +64,30 @@ def get_CL_range(mass,observations, model,unbounded_bounds,cl):
         obs_limit, exp_limits = pyhf.infer.intervals.upper_limits.upper_limit(
             observations,model,poi_values,level=alpha,par_bounds=unbounded_bounds
         )
-        print(iterations,"iterations. low end =",low_end,", high end =",high_end,"obs limit =",obs_limit)
-    print("passed while")
-    print("Final: high end =",high_end,"obs limit =",obs_limit)
+        if debug:
+            print(iterations,"iterations. low end =",low_end,", high end =",high_end,"obs limit =",obs_limit,"delta iter =",delta_iter)
+    if debug:
+        print("passed while")
+        print("Final: high end =",high_end,"obs limit =",obs_limit)
     #return np.linspace(low_end,2*high_end,10)
     #lo_range = max(1000,obs_limit-obs_limit/2.)
     lo_range = low_end
     if obs_limit > 10000:
         lo_range = obs_limit-obs_limit/2.
     up_range = obs_limit+obs_limit/2.
-    return np.linspace(lo_range,up_range,50)
+    if not fast_mode:
+        return np.linspace(lo_range,up_range,50)
+    else:
+        return np.linspace(lo_range,up_range,5)
 
-def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
 
-    print("\nSensitivity for mass %.1f"%(mass))
+def get_limit(directory,filename,mass,timestamp,errors_mode="stat-only",verbose = False,fast_mode = False):
+    if timestamp == "":
+        print("ERROR: No valid timestamp. Exiting.")
+        exit()
+    print(timestamp)
+    print(f"\nSensitivity for mass {mass:.1f}")
+    
 
     #input_root_file = '../root/post_bdtcut_s_b_mass_%i.root'%(mass)
     input_root_file = directory+filename
@@ -213,34 +227,66 @@ def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
         print(model)
         print(json.dumps(model.spec, indent=2))
 
-    # systematics
-    if use_systematics:
-        print("using Systematics")
-
-        syst_file = "/gluster/data/microboone/millicharge/wirecell/30MEV.root"
+    # ERRORS MODES
+    # stat-only (skips all of these)
+    # shapesys (detector variations using quadrature and shapesys)
+    # histosys (detector variations using quadrature and histosys (not implemented yet?))
+    if errors_mode == "shapesys":
+        syst_file = "/gluster/data/microboone/millicharge/wirecell/detvars/400mev_1-15_quadrature.root"
         syst_uprt = uproot.open(syst_file)
         quad = syst_uprt["h_quad"].values().tolist()
-        print("quad:")
-        print(quad)
 
         # we need to convert this "ratio" uncertainty into an absolute one
         data = model.spec['channels'][0]['samples'][0]['data'] #sample 0 is signal
         absolute = []
         for i in range(0,len(data)):
-            absolute.append(abs(data[i]*quad[i]))
+            absolute.append(abs(data[i]*quad[i]*200.0))
         # give it appropriate dictionary format to add to the model
         new_entry = {'name':'quadrature_30mev','type':'shapesys', 'data': absolute}
         # add systematics as modifier
         model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
-        print("added systematics in quadrature, before and after:")
-        print(data)
-        print(absolute)
+        if verbose:
+            print("using Systematics as shapesys")
+            print("quad:")
+            print(quad)
+            print("added systematics in quadrature, before and after:")
+            print(data)
+            print(absolute)
+
+    elif errors_mode == "histosys":
+        syst_file = "/gluster/data/microboone/millicharge/wirecell/detvars/400mev_1-15_quadrature.root"
+        syst_uprt = uproot.open(syst_file)
+        quad = syst_uprt["h_quad"].values().tolist()
+
+        # we need to convert this "ratio" uncertainty into an absolute one
+        data = model.spec['channels'][0]['samples'][0]['data'] #sample 0 is signal
+        hi_data = []
+        lo_data = []
+        for i in range(0,len(data)):
+            hi_data.append(data[i]+data[i]*quad[i])
+            lo_data.append(data[i]-data[i]*quad[i])
+            #lo_data.append(max(0.0,data[i]-data[i]*quad[i]))
+        # give it appropriate dictionary format to add to the model
+        new_entry = {'name':'quadrature_30mev_histosys','type':'histosys', 'data': {"hi_data": hi_data, "lo_data": lo_data}}
+        # add systematics as modifier
+        model.spec['channels'][0]['samples'][0]['modifiers'].append(new_entry)
+        if verbose:
+            print("using HISTOSYS")
+            print("quad:")
+            print(quad)
+
+            print("                 ======== MODEL EXPECTED DATA= ================")
+            print(model.expected_data)
+            print(f"  aux data: {model.config.auxdata}")
+        #print(f"      down: {model.expected_data([-1.0])}")
+        #print(f"   nominal: {model.expected_data([0.0])}")
+        #print(f"        up: {model.expected_data([1.0])}")
         
     # suggested initial parameters
     init_pars = model.config.suggested_init()
     # extend bounds
     unbounded_bounds = model.config.suggested_bounds()
-    unbounded_bounds[model.config.poi_index] = (0, 100000000000.0) # set large number for weak signals
+    unbounded_bounds[model.config.poi_index] = (0, 1000000000000000000.0) # set large number for weak signals
     if verbose == True:
         print("\nSuggested bounds:",model.config.suggested_bounds())
         print("\nInitial parameters:",init_pars)
@@ -272,6 +318,8 @@ def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
             sum_of_bkg_err+=b[bi]
         bkg_errbins.append(sum_of_bkg_err)
 
+    print(json.dumps(model.spec, indent=2)) 
+        
     if verbose == True:
         print("model config auxdata",model.config.auxdata)
         print("bkg_errbins",bkg_errbins)
@@ -304,28 +352,15 @@ def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
 
     cl = 90.
     alpha = round(1-0.01*cl,2)
-    #poi_values = np.linspace(1000, 12000,100)
-    #print("MODEL DUMP:",json.dumps(model.spec, indent=2))
-    #print("observations:",observations)
-    #exit()
-    poi_values = get_CL_range(mass,observations,model,unbounded_bounds,cl)
-    #print(poi_values)
-    #exit()
-    #poi_values = np.linspace(0.00001,0.05,100)
-
-    print("##############################################################")
-    print("##############################################################")
-    print("##############################################################")
-    print("##############################################################")
-    print("##############################################################")
-    print("######### Calling upper_limits:")
-    print("##############################################################")
-    print("##############################################################")
-    print("##############################################################")
-    print("##############################################################")
-    print("##############################################################")
-
+    if not fast_mode:
+        poi_values = get_CL_range(mass,observations,model,unbounded_bounds,cl)
+    else:
+        poi_values = get_CL_range(mass,observations,model,unbounded_bounds,cl,fast_mode=True)
+    
     if verbose == True:
+        print("##############################################################")
+        print("######### Calling upper_limits:")
+        print("##############################################################")
         print(f"\nh_sig (len {len(h_sig)})")
         print(h_sig)
         print(f"\nobservations (len {len(observations)})")
@@ -337,7 +372,6 @@ def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
         print(f"\nmodel:")
         print(model)
         print(json.dumps(model.spec, indent=2)) 
-        
 
     
     obs_limit, exp_limits, (scan, results) = pyhf.infer.intervals.upper_limits.upper_limit(
@@ -346,7 +380,7 @@ def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
 
     fig, ax = plt.subplots()
     fig.set_size_inches(10.5, 7)
-    ax.set_title("Hypothesis Tests, mass %i, μ =%.4f"%(mass,obs_limit))
+    ax.set_title(f"Hypothesis Tests, mass {mass}, μ ={obs_limit:.4f}")
 
     artists = brazil.plot_results(poi_values, results, test_size=alpha, ax=ax)
 
@@ -357,14 +391,10 @@ def get_limit(directory,filename,mass,use_systematics=True,verbose = False):
     model_tag = directory.replace("root","img")
 
     if save:
-        print("\nSaving plot to %s"%(model_tag))
-        pathlib.Path(model_tag).mkdir(parents=True,exist_ok=True)
-        if use_systematics:
-            out_figname_pdf = "%s/limit_mass_%i_cl_%i.pdf"%(model_tag,mass,cl)
-            out_figname_png = "%s/limit_mass_%i_cl_%i.png"%(model_tag,mass,cl)
-        elif not use_systematics:
-            out_figname_pdf = "%s/limit_mass_%i_cl_%i_no-systematics.pdf"%(model_tag,mass,cl)
-            out_figname_png = "%s/limit_mass_%i_cl_%i_no-systematics.png"%(model_tag,mass,cl)
+        print(f"\nSaving plot to {model_tag}/{timestamp}")
+        pathlib.Path(model_tag+"/"+timestamp).mkdir(parents=True,exist_ok=True)
+        out_figname_pdf = f"{model_tag}/{timestamp}/limit_mass_{mass}_cl_{cl}_{errors_mode}.pdf"
+        out_figname_png = f"{model_tag}/{timestamp}/limit_mass_{mass}_cl_{cl}_{errors_mode}.png"
         plt.savefig(out_figname_pdf)
         plt.savefig(out_figname_png)        
     if show:
@@ -376,7 +406,6 @@ all_masses = [15.,20.,30.,50.,80.,100.,150.,200.,250.,300.,350.,400.]
 meson  = 'rho'
 meson = ""
 masses = all_masses
-#masses = [50.]
 if meson == 'pi0':
     masses = [15.,20., 30., 50.]
 if meson == 'eta':
@@ -403,28 +432,32 @@ if meson == 'etp':
 if meson == 'rho':
     masses = [15.,20., 30., 50., 80., 100., 150., 200., 250., 300., 350.]
     
-#masses = [15.]
-#masses = [50.,80.,100.]
 obs_limits = []
 exp_limits = []
 
-#masses = [400.]
-#model = '20000kev_1hits_15mev'
 model = '20000kev_1hits_combinedmasses'
 #model = '20000kev_combinedmass_per_parent_'+meson
 
-    
-for m in masses:
-    #directory = "root/MillichargeGamma3D_run1-2a-2b-3a/"
-    #filename = "hist_BDT_scores_%imev.root"%m
-    directory = f"/gluster/data/microboone/millicharge/sensitivity/{model}/"
-    #name_of_the_mass = model.replace("combinedmasses",f'{int(m)}mev')
-    #filename  = f"{name_of_the_mass}.root"
-    filename  = f"{model}_{int(m)}mev.root"
+fastmode = False # for testing purposes
+masses = all_masses
+#masses = [15.,20.,30.,50.]
+masses = [80.,100.,150.]
+# errors_mode that do something:
+# stat-only - no systematic uncertainties
+# shapesys
+# histosys
+errors_mode = "histosys"
+if errors_mode != "stat-only" and errors_mode != "shapesys" and errors_mode != "histosys":
+    print("ERROR: errors mode not valid")
 
+t = time.localtime()
+timestamp = time.strftime('d%Y%m%d_t%H%M%S',t)
+
+for m in masses:
+    directory = f"/gluster/data/microboone/millicharge/sensitivity/{model}/"
+    filename  = f"{model}_{int(m)}mev.root"
     
-    
-    o_l, e_l = get_limit(directory,filename,m)
+    o_l, e_l = get_limit(directory,filename,m,timestamp,fast_mode=fastmode,errors_mode=errors_mode)
     obs_limits.append(o_l)
     exp_limits.append(e_l)
 
@@ -435,8 +468,10 @@ for i in range(0,len(masses)):
 epsilon = 0.001
 nhits   = 1
 
-print("15. 1.0")
+sens_txt_file_out = f"sensitivity/mysensitivities/sens_{timestamp}_{errors_mode}.txt"
+output_file = open(sens_txt_file_out,"w")
+output_file.write("{} 1.0\n".format(masses[0]))
 for i in range(0,len(masses)):
     sens = epsilon * pow(obs_limits[i],1./(2.+nhits*2))
-    print(masses[i],sens)
-print("400.0 1.0")
+    output_file.write("{} {}\n".format(masses[i],sens))
+output_file.write("{} 1.0\n".format(masses[-1]))
