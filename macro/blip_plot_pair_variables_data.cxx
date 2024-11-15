@@ -79,7 +79,9 @@ void blip_plot_pair_variables_data(TString g_working_dir, int g_run)
   t_pot_sig->SetBranchAddress("tot_pot",&pot_sig);
   t_pot_sig->GetEntry(0);
     
-
+  std::cout << "POT data: " << POT << std::endl;
+  std::cout << "POT sig: " << pot_sig << std::endl;
+  std::cout << "POT genie: " << pot_genie << std::endl;
 
   TString img_dir = Form("%s/blippairs/img/",g_working_dir.Data());
   gSystem->Exec(Form("mkdir -p %s",img_dir.Data()));

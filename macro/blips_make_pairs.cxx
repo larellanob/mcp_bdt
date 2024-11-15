@@ -57,20 +57,24 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
     g_sample_type = Form("%s_%imev",g_sample_type.Data(),g_sig_mass);
   }
 
-  if ( g_sample_type != "sig" ) {
+  if ( !g_sample_type.Contains("sig") ) {
     filename = Form("%s/BlipAna/hist_BlipAna_numi_run%i_%s.root",
 		    work_dir.Data(),
 		    g_run,
 		    g_sample_type.Data()
 		    );
   } else { // if signal
+    std::cout << "signal" << std::endl;
     if ( g_sig_mass != 0 ) { // if not combined masses
+      std::cout << "signal not combined" << std::endl;
+
       filename = Form("%s/BlipAna/sig_%s/hist_BlipAna_numi_run%i_%s.root",
 		      work_dir.Data(),
 		      ch_validation,
 		      g_run,
 		      g_sample_type.Data());
     } else { // if combined masses
+      std::cout << "signal combined" << std::endl;
       filename = Form("%s/BlipAna/sig_%s/hist_BlipAna_numi_run%i_sig_combinedmasses.root",
 		      work_dir.Data(),
 		      ch_validation,
@@ -246,7 +250,6 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
   TTree *tbkg = new TTree("bkg_blip_pairs","Both blips background");
   TTree *tmix = new TTree("mix_blip_pairs","One blip signal, one blip background");
   TTree *tdat = new TTree("dat_blip_pairs","Data blip pairs");
-  std::cout << "delcaring tree list " << std::endl;
 
   std::vector<TTree*> v_trees;
   bool is_data = false;
@@ -313,7 +316,7 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
     bp_event = *evt;
     bp_run = *run;
     bp_subrun = *subrun;
-    //if  ( event > 100 ) break;
+    //if  ( event > 200 ) break;
 
     // fiducial cut lambda
     auto cut_fiducial = [&x,&y,&z](int i) {
@@ -328,11 +331,10 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
       if ( !cut_fiducial(i) ) {
 	continue;
       }
-      TVector3 v_b1 (x[i],y[i],z[i]);
 
       // blip pair classification
-
       for ( int j = i+1; j < x.GetSize(); j++ ) {
+
 	// fiducial cut	
 	if ( !cut_fiducial(j) ) {
 	  continue;
@@ -373,6 +375,7 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
 	bp_perp_dist_closest_overall = -99;
 	bp_dist_closest_overall = -99;
 	
+	TVector3 v_b1 (x[i],y[i],z[i]);
 	TVector3 v_b2 (x[j],y[j],z[j]);
 	// force v_b2.Z > v_b1.Z by flipping 1 and 2 if necessary
 	// need to have new indices
@@ -410,7 +413,7 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
 	    is_bkg = true;
 	  }
 	}
-
+	
 	// angle cut plots
 	if ( is_data ) {
 	  h2_angle_dat->Fill(th,ph);
@@ -455,6 +458,7 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
 
 	bp_blipid1 = ip; // ip: index of b1 (after sorting)
 	bp_blipid2 = jp; // jp: index of b2 (after sorting)
+		
 	// blip pos
 	bp_px1 = v_b1.X();
 	bp_py1 = v_b1.Y();
@@ -663,12 +667,13 @@ void blips_make_pairs(TString g_directory, int g_run, TString g_sample_type, boo
 			 g_directory.Data(),
 			 g_run,
 			 g_sample_type.Data());
-  gSystem->Exec(Form("mkdir -p %s/",img_dir.Data()));
   if ( g_sample_type.Contains("sig") ) {
-    img_dir = Form("mkdir -p %s/sig_%s",
-		   img_dir.Data(),
+    img_dir = Form("%s/run%i/blippairs/img/sig_%s",
+		   g_directory.Data(),
+		   g_run,
 		   ch_validation);
   }
+  gSystem->Exec(Form("mkdir -p %s/",img_dir.Data()));
 
   c1->Print(Form("%s/pairs_ang_%s.pdf[",img_dir.Data(),g_sample_type.Data()));
   h2_angle_sig->Draw("colz");
